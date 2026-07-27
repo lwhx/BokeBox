@@ -18,6 +18,7 @@
   <a href="https://bokebox.aiuo.net/"><img src="https://img.shields.io/badge/Demo-%E6%BC%94%E7%A4%BA%E7%AB%99-0EA5E9?style=flat-square" alt="Demo" /></a>
   <a href="https://bkb-docs.aiuo.net/"><img src="https://img.shields.io/badge/Docs-%E6%96%87%E6%A1%A3-7C5CFF?style=flat-square" alt="Docs" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-LGPL--3.0-22C55E?style=flat-square" alt="LGPL-3.0" /></a>
+  <a href="https://linux.do/"><img src="https://img.shields.io/badge/%E7%A4%BE%E5%8C%BA-LinuxDo-FFA500?style=flat-square&logo=discourse" alt="LinuxDo" /></a>
   <a href="https://github.com/vastsa/BokeBox"><img src="https://visitor-badge.laobi.icu/badge?page_id=vastsa.BokeBox&left_text=visitors&left_color=555&right_color=22C55E" alt="visitors" /></a>
 </p>
 
