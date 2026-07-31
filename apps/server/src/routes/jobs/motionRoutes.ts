@@ -23,13 +23,13 @@ import {
   readConfirmedTimeline,
 } from '../../services/motion/index.js';
 
-const MOTION_BEAT_MAX = 12;
+const MOTION_BEAT_MAX = 16;
 
 function isMotionBeat(value: unknown): value is MotionBeat {
   if (!value || typeof value !== 'object') return false;
   const b = value as Record<string, unknown>;
   if (typeof b.id !== 'string') return false;
-  if (b.kind !== 'motion' && b.kind !== 'closing') return false;
+  if (b.kind !== 'motion' && b.kind !== 'broll' && b.kind !== 'closing') return false;
   if (typeof b.title !== 'string') return false;
   if (typeof b.startMs !== 'number' || typeof b.endMs !== 'number') return false;
   if (!Number.isFinite(b.startMs) || !Number.isFinite(b.endMs)) return false;

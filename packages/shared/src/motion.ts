@@ -307,7 +307,7 @@ export function optimizeSrt(
 
 /* ═══════════════════════ Motion 分镜 / 时间轴 ═══════════════════════ */
 
-export type MotionBeatKind = 'motion' | 'closing';
+export type MotionBeatKind = 'motion' | 'broll' | 'closing';
 
 export interface MotionBeat {
   /** 稳定 id，如 b1 / b2…，收束页为 bn+1 */
@@ -321,12 +321,14 @@ export interface MotionBeat {
   startMs: number;
   /** 真实毫秒终点（收束页 = 末条 cue 的 endMs） */
   endMs: number;
-  /** step 2..N 的绝对毫秒点，严格递增且落在 (startMs, endMs) */
+  /** step 2..N 的绝对毫秒点，严格递增且落在 (startMs, endMs)；broll 通常为空 */
   stepTimes: number[];
   /** step 1..N 的屏幕文字（可选） */
   stepLabels?: string[];
-  /** 覆盖的 cue 范围（1-based，来自优化后 SRT） */
+  /** 覆盖的 cue 范围（1-based，来自优化后 SRT）；broll 无 cue 覆盖时为 [0,0] */
   cueRange: [number, number];
+  /** B-roll 大空档的静音区间起止（仅 kind='broll' 时有效） */
+  brollSilence?: { gapStartMs: number; gapEndMs: number };
 }
 
 export interface MotionTimeline {
@@ -399,7 +401,8 @@ export function buildCoverageRows(beats: MotionBeat[]): CoverageRow[] {
 /**
  * P3.5 时间轴确认门（纯校验，可单测）：
  * - 首 beat 从 0ms 开始；
- * - 相邻 beat 不重叠，空档 ≤ 500ms；
+ * - 相邻 beat 不重叠，空档 ≤ 500ms（大空档应由 broll beat 填充，broll 也是
+ *   正式 beat，参与同样的 gap 检查，因此被覆盖的空档不会触发违规）；
  * - steps 绝对毫秒点严格递增且落在 beat 区间内；
  * - 收束页（closing）的 endMs 必须贴合主时钟总时长；
  * - beats 必须按时间排序。

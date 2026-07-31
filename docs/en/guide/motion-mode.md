@@ -34,6 +34,12 @@ The design is adapted from [jacky-motion](https://github.com/jackywxsz/jacky-mot
 
 Once confirmed, the timeline is locked (`motion-timeline.json`) and can be re-assembled any number of times without drifting when the pipeline is re-run.
 
+## Storyboard & B-roll
+
+- **motion beat**: information chapter page; title is a distilled short on-screen text (opening fillers stripped, shorter than the narration); steps reveal one by one following narration rhythm (2–5 steps), each pinned to the `startMs` of a semantic trigger cue
+- **broll beat**: large silent gaps (>500 ms, common at paragraph breaks / music) first split the surrounding beats at a forced cut point, then are filled with a real broll transition page (large index number + preview title) so the picture never idles while narration pauses; the gate treats broll as a regular beat in coverage checks
+- **closing beat**: the final recap page whose `endMs` hugs the master clock duration (±300 ms) and freezes on the last frame
+
 ## HTML player
 
 - **Master clock**: `performance.now()` + `requestAnimationFrame`, no setTimeout chains; catches up by absolute time after a background tab
@@ -69,3 +75,4 @@ BokeBox's Motion mode is adapted from [jacky-motion](https://github.com/jackywxs
 - Removed the 6-stage LLM style selection; deterministic storyboard with one built-in dark editorial style
 - Coverage table / gate rules aligned directly with BokeBox's millisecond TTS timeline
 - Pure logic (parse / optimize / gate) lives in `@bokebox/shared`, shared by server and web to avoid rule drift
+- B-roll implemented as "forced cut + fill": large silences first split the beat, then become broll pages, keeping the gate passable and the picture alive

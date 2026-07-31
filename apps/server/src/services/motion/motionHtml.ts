@@ -63,6 +63,7 @@ function runtimeScript(): string {
       endMs: Number(beat.getAttribute('data-end-ms')),
       stepTimes: stepTimes
         ? stepTimes.split(',').map(function (v) { return Number(v.trim()); })
+          .filter(function (n) { return Number.isFinite(n); })
         : []
     };
   });
@@ -307,9 +308,11 @@ function beatHtml(input: {
   endMs: number;
   stepTimes: number[];
 }): string {
-  const steps = input.stepLabels.length
-    ? input.stepLabels
-    : [input.title];
+  const steps = input.kind === 'broll'
+    ? []
+    : input.stepLabels.length
+      ? input.stepLabels
+      : [input.title];
   const stepNodes = steps
     .map((label, i) => {
       const isLast = i === steps.length - 1;
@@ -322,13 +325,24 @@ function beatHtml(input: {
     })
     .join('');
   const isClosing = input.kind === 'closing';
+  const isBroll = input.kind === 'broll';
+  const kicker = isBroll
+    ? 'B-ROLL'
+    : isClosing
+      ? '收束 · 总结'
+      : `章节 ${input.cueRange[0]}–${input.cueRange[1]}`;
+  const beatClass = `beat${isClosing ? ' beat-closing' : ''}${isBroll ? ' beat-broll' : ''}`;
+  const brollIndex = isBroll
+    ? `<div class="broll-index">${String(parseInt(input.id.replace(/\D+/gu, ''), 10) || 1).padStart(2, '0')}</div>`
+    : '';
   return (
-    `<section class="beat${isClosing ? ' beat-closing' : ''}" id="${esc(input.id)}" ` +
+    `<section class="${beatClass}" id="${esc(input.id)}" ` +
     `data-kind="${esc(input.kind)}" data-steps="${steps.length}" ` +
     `data-start-ms="${input.startMs}" data-end-ms="${input.endMs}" ` +
     `data-step-times="${input.stepTimes.join(',')}">` +
     `<div class="scene">` +
-    `<div class="beat-kicker">${isClosing ? '收束 · 总结' : `章节 ${input.cueRange[0]}–${input.cueRange[1]}`}</div>` +
+    `${brollIndex}` +
+    `<div class="beat-kicker">${kicker}</div>` +
     `<h2 class="beat-title">${esc(input.title)}</h2>` +
     `<div class="beat-steps">${stepNodes}</div>` +
     `</div></section>`
@@ -382,7 +396,7 @@ body{overflow:hidden;background:var(--bg);color:var(--text);
 .beat-kicker::before{content:"";width:52px;height:4px;border-radius:2px;
   background:linear-gradient(90deg,var(--c1),var(--c2))}
 .beat-title{font-size:88px;line-height:1.22;font-weight:700;
-  max-width:1500px;word-break:break-word;margin-bottom:64px;
+  max-width:1500px;word-break:break-word;text-wrap:balance;margin-bottom:64px;
   text-shadow:0 2px 40px rgba(0,0,0,.35)}
 .beat-steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));
   gap:26px;max-width:1600px}
@@ -401,6 +415,16 @@ body{overflow:hidden;background:var(--bg);color:var(--text);
 .beat-closing .step{background:linear-gradient(90deg,rgba(99,102,241,.14),rgba(168,85,247,.1));
   border-color:rgba(139,92,246,.35)}
 .beat-closing .step-lock .step-text{font-weight:600}
+/* B-roll：无口播的静音过渡段（正式 beat，只显示序号与短标题） */
+.beat-broll{background:radial-gradient(1000px 600px at 50% 40%,rgba(99,102,241,.12),transparent 60%)}
+.beat-broll .scene{justify-content:center;align-items:center;text-align:center;gap:14px}
+.beat-broll .beat-kicker{justify-content:center;letter-spacing:.5em;margin-bottom:10px}
+.beat-broll .beat-kicker::before{display:none}
+.beat-broll .beat-title{font-size:52px;max-width:1200px;margin-bottom:0}
+.beat-broll .beat-steps{display:none}
+.broll-index{font-size:220px;font-weight:700;line-height:1;letter-spacing:.08em;
+  background:linear-gradient(120deg,var(--c1),var(--c2));
+  -webkit-background-clip:text;background-clip:text;color:transparent;opacity:.4}
 /* HUD */
 .hud{position:absolute;left:0;right:0;bottom:0;height:56px;z-index:90;
   display:flex;align-items:center;justify-content:space-between;

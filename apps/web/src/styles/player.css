@@ -2582,6 +2582,10 @@ html[data-theme="dark"] .qq-lyrics-return {
   color: var(--brand-2);
   background: var(--brand-soft);
 }
+.qq-motion-kind.is-broll {
+  color: var(--text-3);
+  background: color-mix(in srgb, var(--separator) 45%, transparent);
+}
 .qq-motion-kind.is-closing {
   color: var(--ok-strong, #16a34a);
   background: color-mix(in srgb, #16a34a 12%, transparent);

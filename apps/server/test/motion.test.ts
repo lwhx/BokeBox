@@ -124,6 +124,44 @@ describe('motion P3.5 timeline gate', () => {
     assert.equal(gate.rows.length, 2);
   });
 
+  it('fills a large silence gap with a broll beat instead of failing', () => {
+    const broll: MotionBeat = {
+      id: 'b2',
+      kind: 'broll',
+      title: '过渡 · 下节预告',
+      startMs: 12000,
+      endMs: 18000,
+      stepTimes: [],
+      cueRange: [0, 0],
+    };
+    const beats = [
+      beat('b1', 0, 12000, [5500]),
+      broll,
+      { ...beat('b3', 18000, 26000), kind: 'closing' as const },
+    ];
+    // 没有 broll 时，4s 空档必然违规
+    const noBroll = validateTimeline([beats[0], beats[2]], 26000);
+    assert.equal(noBroll.pass, false);
+    assert.ok(noBroll.violations.some((v) => v.code === 'beat-gap'));
+    // broll 填充后门禁通过
+    const gate = validateTimeline(beats, 26000);
+    assert.equal(gate.pass, true);
+    assert.equal(gate.violations.length, 0);
+    const brollRow = gate.rows.find((r) => r.kind === 'broll');
+    assert.equal(brollRow?.startMs, 12000);
+    assert.equal(brollRow?.endMs, 18000);
+  });
+
+  it('broll without steps does not trigger step violations', () => {
+    const beats = [
+      beat('b1', 0, 12000),
+      { id: 'b2', kind: 'broll' as const, title: '间奏', startMs: 12000, endMs: 15000, stepTimes: [], cueRange: [0, 0] },
+      { ...beat('b3', 15000, 24000), kind: 'closing' as const },
+    ];
+    const gate = validateTimeline(beats, 24000);
+    assert.equal(gate.pass, true);
+  });
+
   it('fails when first beat does not start at 0', () => {
     const beats = [beat('b1', 300, 12000)];
     const gate = validateTimeline(beats, 12000);
