@@ -21,7 +21,7 @@ The design is adapted from [jacky-motion](https://github.com/jackywxsz/jacky-mot
 | **S1 Optimize SRT** | Read `podcast.srt` (fall back to `script-timing.json`), merge fragments, split overlong cues, repair overlaps, report coverage |
 | **S2 Master clock** | Total duration = end of the last optimized cue; the whole timeline uses milliseconds as its single reference |
 | **S3 Storyboard** | Outline segments → beats (boundaries pinned to anchor cue `startMs`); without an outline, split by character weight; last beat is the closing page |
-| **S3.5 P3.5 gate** | Full-coverage check: first beat starts at 0ms, gaps ≤500ms, no overlapping beats, step ms strictly increasing within the window, closing page aligns with the master clock (±300ms) |
+| **S3.5 P3.5 gate** | Full-coverage check: first beat starts at 0ms, gaps ≤1500ms, no overlapping beats, step ms strictly increasing within the window, closing page aligns with the master clock (±300ms) |
 | **S4 Assemble** | On gate pass, confirm the timeline (writes `motion-timeline.json`) and assemble the single-file `motion.html` |
 | **S5 Static validation** | String-level re-check: beat count, millisecond points, monotonic steps, runtime markers, unique ids |
 
@@ -37,7 +37,7 @@ Once confirmed, the timeline is locked (`motion-timeline.json`) and can be re-as
 ## Storyboard & B-roll
 
 - **motion beat**: information chapter page; title is a distilled short on-screen text (opening fillers stripped, shorter than the narration); steps reveal one by one following narration rhythm (2–5 steps), each pinned to the `startMs` of a semantic trigger cue
-- **broll beat**: large silent gaps (>500 ms, common at paragraph breaks / music) first split the surrounding beats at a forced cut point, then are filled with a real broll transition page (large index number + preview title) so the picture never idles while narration pauses; the gate treats broll as a regular beat in coverage checks
+- **broll beat**: large silent gaps (≥1.5 s, common at paragraph breaks / music) first split the surrounding beats at a forced cut point, then are filled with a real broll transition page (large index number + preview title) so the picture never idles while narration pauses; the gate treats broll as a regular beat in coverage checks. Gaps under 1.5 s are normal narration pace and stay inside the beat (automated storyboarding does not split them)
 - **closing beat**: the final recap page whose `endMs` hugs the master clock duration (±300 ms) and freezes on the last frame
 
 ## HTML player
@@ -76,3 +76,4 @@ BokeBox's Motion mode is adapted from [jacky-motion](https://github.com/jackywxs
 - Coverage table / gate rules aligned directly with BokeBox's millisecond TTS timeline
 - Pure logic (parse / optimize / gate) lives in `@bokebox/shared`, shared by server and web to avoid rule drift
 - B-roll implemented as "forced cut + fill": large silences first split the beat, then become broll pages, keeping the gate passable and the picture alive
+- Gate gap limit relaxed from 500 ms to 1500 ms: automated storyboarding cannot fill gaps as finely as a human; TTS inter-sentence pauses up to ~1.5 s are normal narration pace; ≥1.5 s still forces a broll fill

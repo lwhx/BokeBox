@@ -167,7 +167,7 @@ const MIN_BEAT_MS = 5_000;
 const MAX_BEAT_MS = 30_000;
 const MAX_BEATS = 16;
 /** 空档超过该值时必须插入 broll beat 填充（与门禁 gapLimitMs 对齐） */
-const BROLL_GAP_THRESHOLD_MS = 500;
+const BROLL_GAP_THRESHOLD_MS = 1500;
 
 /* ---- 屏幕文字提炼（屏幕文字短于口播，去开场白与语气词） ---- */
 
@@ -259,9 +259,9 @@ export function buildStoryboard(input: StoryboardInput): StoryboardResult {
         anchors.push(searchFrom);
       }
     }
-    // 保证单调并去重，注入大空档强制切分点
+    // 保证单调并去重：anchors 与强制切分点交错时统一排序（强制切分点不能丢）
     const unique: number[] = [];
-    for (const a of [...anchors, ...forcedCuts]) {
+    for (const a of [...anchors, ...forcedCuts].sort((x, y) => x - y)) {
       const lastAnchor = unique[unique.length - 1];
       if (lastAnchor === undefined || a > lastAnchor) unique.push(a);
     }
@@ -269,7 +269,9 @@ export function buildStoryboard(input: StoryboardInput): StoryboardResult {
     if (unique[unique.length - 1] !== lastPaired) unique.push(lastPaired);
 
     for (let i = 0; i < unique.length - 1; i += 1) {
-      const start = unique[i];
+      // 首段强制从 cue 0 开始：开场口播（欢迎语/引入）属于首段，
+      // anchor 只用于定位段内代表 cue，不能把整段开头顶掉
+      const start = i === 0 ? 0 : unique[i];
       const rawEnd = i + 1 < unique.length - 1 ? unique[i + 1] - 1 : lastPaired;
       const end = Math.max(start, rawEnd);
       boundaries.push({

@@ -40,10 +40,13 @@ export function clearServerSession(): Promise<void> {
 export class ApiError extends Error {
   status: number;
   code?: string;
-  constructor(message: string, status: number, code?: string) {
+  /** 统一信封失败时的 data 负载（如门禁违规明细 gate/rows） */
+  data?: unknown;
+  constructor(message: string, status: number, code?: string, data?: unknown) {
     super(message);
     this.status = status;
     this.code = code;
+    this.data = data;
   }
 }
 
@@ -79,6 +82,7 @@ export function parseApiBody<T>(raw: unknown, httpStatus: number): T {
         raw.message || tOutside('api.requestFailed', { status: httpStatus }),
         httpStatus || raw.code || 500,
         raw.errorCode,
+        raw.data,
       );
     }
     return raw.data as T;

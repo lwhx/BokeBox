@@ -15,13 +15,14 @@ import {
 } from '../../api/motion';
 import { useI18n } from '../../i18n';
 import { getToken } from '../../lib/auth';
+import { ApiError } from '../../api/http';
 
 type Phase =
   | { kind: 'idle' }
   | { kind: 'loading' }
   | { kind: 'ready'; draft: MotionDraftResponse }
   | { kind: 'confirmed'; timeline: MotionTimeline }
-  | { kind: 'error'; message: string };
+  | { kind: 'error'; message: string; gate?: GateResult | null; rows?: CoverageRow[] };
 
 function fmtMs(ms: number): string {
   const total = Math.max(0, Math.floor(ms / 1000));
@@ -87,12 +88,17 @@ export function MotionPanel({ jobId }: { jobId: string }) {
     try {
       const draft = await draftMotionTimeline(jobId);
       if (!draft.ok) {
-        setPhase({ kind: 'error', message: draft.message || t('motion.gateFailed') });
+        setPhase({ kind: 'error', message: draft.message || t('motion.gateFailed'), gate: draft.gate });
       } else {
         setPhase({ kind: 'ready', draft });
       }
     } catch (e) {
-      setPhase({ kind: 'error', message: e instanceof Error ? e.message : String(e) });
+      setPhase({
+        kind: 'error',
+        message: e instanceof Error ? e.message : String(e),
+        gate: e instanceof ApiError ? (e.data as { gate?: GateResult | null } | undefined)?.gate ?? null : null,
+        rows: e instanceof ApiError ? (e.data as { rows?: CoverageRow[] } | undefined)?.rows : undefined,
+      });
     } finally {
       setBusy(false);
     }
@@ -161,7 +167,27 @@ export function MotionPanel({ jobId }: { jobId: string }) {
         )}
       </div>
 
-      {phase.kind === 'error' && <p className="qq-motion-error">{phase.message}</p>}
+      {phase.kind === 'error' && (
+        <>
+          <p className="qq-motion-error">{phase.message}</p>
+          {phase.gate && (
+            <>
+              <div className="qq-motion-gate is-fail">
+                <span className="qq-motion-gate-dot" />
+                {gateSummary(phase.gate).text}
+              </div>
+              {phase.gate.violations.length > 0 && (
+                <ul className="qq-motion-notes">
+                  {phase.gate.violations.map((v, i) => (
+                    <li key={i}>{v.message}</li>
+                  ))}
+                </ul>
+              )}
+            </>
+          )}
+          {phase.rows && phase.rows.length > 0 && <MotionCoverageTable rows={phase.rows} />}
+        </>
+      )}
 
       {phase.kind === 'confirmed' && (
         <div className="qq-motion-gate is-pass">

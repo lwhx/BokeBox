@@ -176,17 +176,18 @@ describe('motion P3.5 timeline gate', () => {
     assert.ok(gate.violations.some((v) => v.code === 'beat-overlap'));
   });
 
-  it('fails on gap over 500ms', () => {
-    const beats = [beat('b1', 0, 10000), beat('b2', 12000, 24000)];
+  it('fails on gap over 1500ms', () => {
+    const beats = [beat('b1', 0, 10000), beat('b2', 12500, 24000)];
     const gate = validateTimeline(beats, 24000);
     assert.equal(gate.pass, false);
     assert.ok(gate.violations.some((v) => v.code === 'beat-gap'));
   });
 
-  it('accepts gaps within 500ms', () => {
+  it('accepts narration-pace gaps within 1500ms', () => {
     const beats = [beat('b1', 0, 10000), beat('b2', 10400, 24000)];
     const gate = validateTimeline(beats, 24000);
     assert.equal(gate.pass, true);
+    assert.equal(gate.gapMs, 400);
   });
 
   it('fails on step times out of range or non-monotonic', () => {

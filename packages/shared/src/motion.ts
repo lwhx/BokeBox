@@ -382,7 +382,12 @@ export interface GateResult {
   gapMs: number;
 }
 
-export const GATE_GAP_LIMIT_MS = 500;
+/**
+ * 门禁空档门限。skill 原文为 500ms（人工分镜的严格标准）；BokeBox 为自动化
+ * 分镜，TTS 句间停顿可达 ~1.5s（属于正常口播节奏，画面停留可接受），因此
+ * 放宽到 1500ms，且 ≥1500ms 的停顿由 storyboard 强制切分并填充 broll。
+ */
+export const GATE_GAP_LIMIT_MS = 1500;
 export const GATE_END_TOLERANCE_MS = 300;
 
 /** 由 beats 生成 P3.5 覆盖表 */
@@ -401,8 +406,8 @@ export function buildCoverageRows(beats: MotionBeat[]): CoverageRow[] {
 /**
  * P3.5 时间轴确认门（纯校验，可单测）：
  * - 首 beat 从 0ms 开始；
- * - 相邻 beat 不重叠，空档 ≤ 500ms（大空档应由 broll beat 填充，broll 也是
- *   正式 beat，参与同样的 gap 检查，因此被覆盖的空档不会触发违规）；
+ * - 相邻 beat 不重叠，空档 ≤ 1500ms（≥1500ms 的大空档应由 broll beat 填充，
+ *   broll 也是正式 beat，参与同样的 gap 检查，因此被覆盖的空档不会触发违规）；
  * - steps 绝对毫秒点严格递增且落在 beat 区间内；
  * - 收束页（closing）的 endMs 必须贴合主时钟总时长；
  * - beats 必须按时间排序。

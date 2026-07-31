@@ -27,6 +27,7 @@ export const ApiErrorCode = {
   PAYLOAD_TOO_LARGE: 'PAYLOAD_TOO_LARGE',
   NEEDS_SETUP: 'NEEDS_SETUP',
   INTERNAL_ERROR: 'INTERNAL_ERROR',
+  GATE_FAILED: 'GATE_FAILED',
 } as const;
 
 export type ApiErrorCodeName =

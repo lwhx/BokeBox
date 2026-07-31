@@ -16,6 +16,7 @@ import { pathExists } from '../../utils/fs.js';
 import { sendMedia } from './helpers.js';
 import { getRequestLocale, t } from '../../i18n/index.js';
 import type { MotionBeat } from '@bokebox/shared';
+import { ApiErrorCode, fail } from '../../utils/apiResponse.js';
 import {
   buildFromConfirmed,
   confirmAndBuild,
@@ -67,13 +68,20 @@ export async function motionRoutes(app: FastifyInstance): Promise<void> {
     if (!job) return reply.code(404).send({ error: t(getRequestLocale(req), 'job.notFound') });
     const draft = await draftTimeline(job);
     if (!draft.ok) {
+      // 统一信封 + 详情放 data：门禁违规明细（violations / rows）必须能透传前端
       return reply.code(422).send({
-        ok: false,
-        error: draft.error || 'gate-failed',
-        message: draft.notes.join('；'),
-        gate: draft.gate,
-        rows: draft.rows,
-        srtInfo: draft.srtInfo,
+        code: 422,
+        message: t(getRequestLocale(req), 'job.motionGateFailed'),
+        data: {
+          error: draft.error || 'gate-failed',
+          gate: draft.gate,
+          rows: draft.rows,
+          beats: draft.beats,
+          durationMs: draft.durationMs,
+          notes: draft.notes,
+          srtInfo: draft.srtInfo,
+        },
+        errorCode: ApiErrorCode.GATE_FAILED,
       });
     }
     return {
@@ -95,19 +103,19 @@ export async function motionRoutes(app: FastifyInstance): Promise<void> {
       if (!job) return reply.code(404).send({ error: t(getRequestLocale(req), 'job.notFound') });
       const rawBeats = req.body?.beats;
       if (!Array.isArray(rawBeats) || rawBeats.length === 0 || rawBeats.length > MOTION_BEAT_MAX) {
-        return reply.code(400).send({ error: 'beats 必须是非空数组（≤12）' });
+        return reply.code(400).send(fail(400, `beats 必须是非空数组（≤${MOTION_BEAT_MAX}）`, ApiErrorCode.BAD_REQUEST));
       }
       if (!rawBeats.every(isMotionBeat)) {
-        return reply.code(400).send({ error: 'beats 字段不完整' });
+        return reply.code(400).send(fail(400, 'beats 字段不完整', ApiErrorCode.BAD_REQUEST));
       }
       const beats = rawBeats as MotionBeat[];
       const result = await confirmAndBuild(job, beats);
       if (!result.ok) {
         return reply.code(422).send({
-          ok: false,
-          error: result.error || 'gate-failed',
-          gate: result.gate,
-          timeline: result.timeline,
+          code: 422,
+          message: t(getRequestLocale(req), 'job.motionGateFailed'),
+          data: { error: result.error || 'gate-failed', gate: result.gate, timeline: result.timeline },
+          errorCode: ApiErrorCode.GATE_FAILED,
         });
       }
       return { ok: true, timeline: result.timeline, html: result.html };
@@ -120,7 +128,12 @@ export async function motionRoutes(app: FastifyInstance): Promise<void> {
     if (!job) return reply.code(404).send({ error: t(getRequestLocale(req), 'job.notFound') });
     const result = await buildFromConfirmed(job);
     if (!result.ok) {
-      return reply.code(422).send({ ok: false, error: result.error || 'no-confirmed-timeline' });
+      return reply.code(422).send({
+        code: 422,
+        message: t(getRequestLocale(req), 'job.motionGateFailed'),
+        data: { error: result.error || 'no-confirmed-timeline', gate: result.gate, timeline: result.timeline },
+        errorCode: result.error === 'html-invalid' ? ApiErrorCode.INTERNAL_ERROR : ApiErrorCode.GATE_FAILED,
+      });
     }
     return { ok: true, timeline: result.timeline, html: result.html };
   });
