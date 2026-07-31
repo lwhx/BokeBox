@@ -10,6 +10,8 @@ Motion 把一集已经合成音频的播客变成一套 **16:9 在线信息页�
 
 设计参考 [jacky-motion](https://github.com/jackywxsz/jacky-motion)（MIT），保留「SRT 主时钟 + 确认门」核心思想，并按 BokeBox 的产品形态重构。
 
+页面生成进一步采用 Jacky-motion 的方法：先锁定单一风格和信息原语，再选择稳定版式骨架；每页只保留一个第一眼主视觉，不做“标题 + 多张等宽卡片”的 Dashboard。当前支持 `apple-tech-gradient`、`editorial-magazine`、`sketch-note`、`finance-studio-cards`、`newspaper-evidence`、`paper-collage` 六种风格。
+
 ## 在播放器中生成
 
 1. 打开某集节目，确认已有合成音频和口播稿。
@@ -29,7 +31,7 @@ Motion 把一集已经合成音频的播客变成一套 **16:9 在线信息页�
 | **S2 主时钟** | 总时长 = 优化后最后一条 cue 的 `endMs`，全时间轴以毫秒为唯一基准 |
 | **S3 分镜** | 大纲 segment → beat（边界钉在 anchor cue 的 `startMs`），无大纲时按字重均分；末 beat 为收束页；屏幕文字做提炼（去开场白、截断、短于口播） |
 | **S3.5 P3.5 确认门** | 全覆盖检查：首 beat 从 0ms 开始、空档 ≤1500ms、beat 不重叠、step 毫秒点严格递增且在区间内、收束页贴合主时钟（±300ms） |
-| **S4 AI 页面** | AI 只生成视觉内容层，和已经通过门禁的 beat 合并 |
+| **S4 AI 页面** | AI 锁定单一风格、版式骨架和信息原语，再生成视觉内容层 |
 | **S5 在线预览 / 导出** | React 播放器跟随音频实时显示页面；需要时装配单文件 `motion.html` |
 
 ## 在播放器中生成
@@ -42,13 +44,19 @@ Motion 把一集已经合成音频的播客变成一套 **16:9 在线信息页�
 - **broll beat**：无口播的大空档（**≥1.5s** 静音，常见于段落停顿 / 音乐）会先作为强制切分点把前后 beat 切开，再填充为正式 broll 过渡页（大号序号 + 预告短标题），画面不会在口播停止时空等；门禁视 broll 为正式 beat 参与覆盖检查。1.5s 以内的句间停顿属正常口播节奏，留在 beat 内（自动分镜不细分）
 - **closing beat**：末段收束页，`endMs` 贴合主时钟总时长（±300ms），SRT 播完定格终帧
 
+### 页面与镜头规则
+
+- 信息原语分为 Claim、Contrast、Path、System、Evidence；每个 beat 只选择一种主原语。
+- 核心 beat 使用 `glance → reconstruct → push → lock` 四段式镜头；动画完成后停在可截图的最终帧。
+- 风格由整集统一锁定，AI 不会在相邻页面之间随机换皮。
+
 ## HTML 播放器
 
 - **主时钟**：`performance.now()` + `requestAnimationFrame`，无 setTimeout 链；切后台回来按绝对时间追帧
 - **门 overlay**：准备播放 → 3-2-1 倒计时（录屏前预留）
 - **HUD**：分镜圆点 + 当前毫秒时钟
 - **键盘**：`空格` 暂停 / 继续 · `←` `→` 跳 5 秒 · `R` 重播 · `F` 全屏
-- **样式**：deep navy 背景 + indigo/cyan 品牌渐变（按 jobId 派生），收束页金色 accent；纯 CSS 过渡 + class 切换，零外部依赖
+- **样式**：整集单一风格；支持产品发布会黑场、编辑杂志、手绘线稿、财经演播室、证据报纸和纸张拼贴六种方向，纯 CSS 过渡 + class 切换，零外部依赖
 
 ## API
 

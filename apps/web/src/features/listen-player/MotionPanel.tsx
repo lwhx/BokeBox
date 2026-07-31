@@ -21,15 +21,77 @@ function fmtMs(ms: number): string {
 }
 
 function fallbackScene(beat: MotionTimeline['beats'][number], index: number): MotionScene {
+  const primitive = beat.kind === 'closing'
+    ? 'Claim'
+    : beat.stepLabels?.length && beat.stepLabels.length > 1
+      ? 'Path'
+      : 'Claim';
   return {
     beatId: beat.id,
     layout: beat.kind === 'closing' ? 'closing' : index === 0 ? 'hero' : 'split',
+    primitive,
+    visual: beat.kind === 'closing' ? 'quote-lock' : primitive === 'Path' ? 'path-build' : 'claim-lockup',
     eyebrow: beat.kind === 'closing' ? 'TAKEAWAY' : `PART ${String(index + 1).padStart(2, '0')}`,
     title: beat.title,
     body: '',
     bullets: beat.stepLabels || [],
     accent: ['#8b5cf6', '#22d3ee', '#f59e0b', '#f472b6'][index % 4],
   };
+}
+
+function resolveScene(
+  page: MotionPageSpec | undefined,
+  beat: MotionTimeline['beats'][number],
+  index: number,
+): MotionScene {
+  const fallback = fallbackScene(beat, index);
+  const stored = page?.scenes.find((item) => item.beatId === beat.id) as Partial<MotionScene> | undefined;
+  return {
+    ...fallback,
+    ...stored,
+    primitive: stored?.primitive || fallback.primitive,
+    visual: stored?.visual || fallback.visual,
+  };
+}
+
+function MotionVisualGraphic({ scene }: { scene: MotionScene }) {
+  const bullets = scene.bullets.slice(0, 4);
+  if (scene.visual === 'path-build') {
+    return (
+      <div className="qq-motion-live-path">
+        {bullets.map((item, index) => (
+          <div className="qq-motion-live-path-item" key={`${item}-${index}`}>
+            <span>{String(index + 1).padStart(2, '0')}</span>
+            <strong>{item}</strong>
+            {index < bullets.length - 1 && <i aria-hidden />}
+          </div>
+        ))}
+      </div>
+    );
+  }
+  if (scene.visual === 'split-compare') {
+    return (
+      <div className="qq-motion-live-split">
+        <div><small>BEFORE</small><strong>{bullets[0] || '原来的做法'}</strong></div>
+        <i aria-hidden />
+        <div className="is-focus"><small>AFTER</small><strong>{bullets[1] || scene.title}</strong></div>
+      </div>
+    );
+  }
+  if (scene.visual === 'system-layer-expand') {
+    return (
+      <div className="qq-motion-live-layers">
+        {bullets.slice(0, 3).map((item, index) => <div key={`${item}-${index}`}><span>{String(index + 1).padStart(2, '0')}</span><strong>{item}</strong></div>)}
+      </div>
+    );
+  }
+  if (scene.visual === 'number-count') {
+    return <div className="qq-motion-live-number"><strong>{String(bullets.length || 1).padStart(2, '0')}</strong><span>KEY POINTS</span></div>;
+  }
+  if (scene.visual === 'quote-lock') {
+    return <blockquote className="qq-motion-live-quote">{scene.body || scene.title}</blockquote>;
+  }
+  return <div className="qq-motion-live-lockup"><i aria-hidden /><span>{scene.primitive}</span></div>;
 }
 
 function MotionPreview({
@@ -55,33 +117,29 @@ function MotionPreview({
   );
   const beat = timeline.beats[activeIndex] || timeline.beats[0];
   const page: MotionPageSpec | undefined = timeline.page;
-  const scene = page?.scenes.find((item) => item.beatId === beat?.id) || fallbackScene(beat, activeIndex);
+  const scene = resolveScene(page, beat, activeIndex);
+  const style = page?.style || 'editorial-magazine';
   const totalSec = durationSec > 0 ? durationSec : timeline.durationMs / 1000;
   const progress = totalSec > 0 ? Math.min(100, (currentSec / totalSec) * 100) : 0;
 
   return (
     <div className={['qq-motion-preview', playing ? 'is-playing' : ''].join(' ')}>
-      <div className="qq-motion-canvas" style={{ '--motion-accent': scene.accent } as CSSProperties}>
+      <div className={['qq-motion-canvas', `motion-style-${style}`].join(' ')} style={{ '--motion-accent': scene.accent } as CSSProperties}>
         <div className="qq-motion-canvas-grid" aria-hidden />
         <div className="qq-motion-canvas-top">
           <span>{scene.eyebrow}</span>
           <span>{fmtMs(nowMs)} / {fmtMs(timeline.durationMs)}</span>
         </div>
-        <div className={['qq-motion-scene', `is-${scene.layout}`].join(' ')}>
+        <div className={['qq-motion-scene', `is-${scene.layout}`, `is-${scene.visual}`].join(' ')}>
           <div className="qq-motion-scene-index">{String(activeIndex + 1).padStart(2, '0')}</div>
           <div className="qq-motion-scene-copy">
             <h4>{scene.title}</h4>
             {scene.body && <p>{scene.body}</p>}
-            {scene.bullets.length > 0 && (
-              <div className="qq-motion-scene-bullets">
-                {scene.bullets.map((bullet, index) => <span key={`${bullet}-${index}`}>{bullet}</span>)}
-              </div>
-            )}
+            <MotionVisualGraphic scene={scene} />
           </div>
-          <div className="qq-motion-orbit" aria-hidden><i /><i /><i /></div>
         </div>
         <div className="qq-motion-canvas-footer">
-          <span>{page?.source === 'ai' ? 'AI GENERATED PAGE' : 'MOTION PAGE'}</span>
+          <span>{page?.source === 'ai' ? `AI · ${style}` : `MOTION · ${style}`}</span>
           <span>{timeline.title}</span>
         </div>
       </div>
@@ -239,11 +297,11 @@ export function MotionPanel({
             </div>
             <div className="qq-motion-scene-list">
               {timeline.beats.map((beat, index) => {
-                const scene = timeline.page?.scenes.find((item) => item.beatId === beat.id) || fallbackScene(beat, index);
+                const scene = resolveScene(timeline.page, beat, index);
                 return (
                   <button key={beat.id} type="button" onClick={() => onSeek(beat.startMs / 1000)} className={index === activeBeatIndex ? 'is-current' : ''}>
                     <span className="qq-motion-scene-list-time">{fmtMs(beat.startMs)}</span>
-                    <span className="qq-motion-scene-list-copy"><small>{scene.eyebrow} · {scene.layout}</small><strong>{scene.title}</strong></span>
+                    <span className="qq-motion-scene-list-copy"><small>{scene.eyebrow} · {scene.primitive} · {scene.visual}</small><strong>{scene.title}</strong></span>
                     <span className="qq-motion-scene-list-arrow">↗</span>
                   </button>
                 );

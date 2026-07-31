@@ -12,6 +12,7 @@ import {
   type MotionBeat,
 } from '@bokebox/shared';
 import { renderMotionHtml } from '../src/services/motion/motionHtml.js';
+import { validateMotionHtml } from '../src/services/motion/validateMotionHtml.js';
 
 const SAMPLE_SRT = `1
 00:00:00,000 --> 00:00:04,200
@@ -248,6 +249,8 @@ describe('motion AI page layer', () => {
         scenes: [{
           beatId: 'b1',
           layout: 'hero' as const,
+          primitive: 'Claim' as const,
+          visual: 'claim-lockup' as const,
           eyebrow: 'KEY IDEA',
           title: 'AI 页面标题',
           body: '根据口播稿生成的补充说明',
@@ -260,5 +263,6 @@ describe('motion AI page layer', () => {
     assert.match(html, /AI 页面标题/);
     assert.match(html, /根据口播稿生成的补充说明/);
     assert.match(html, /第一条视觉要点/);
+    assert.equal(validateMotionHtml(html, timeline).ok, true);
   });
 });

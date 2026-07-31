@@ -8,7 +8,9 @@ Motion turns a finished podcast episode into a **16:9 online information page**.
 
 The page is previewed directly inside the player. A single-file HTML download remains available as a secondary path for recording and offline sharing.
 
-The design is adapted from [jacky-motion](https://github.com/jackywxsz/jacky-motion) (MIT), keeping its “SRT master clock + confirmation gate” core while reshaping the product flow for BokeBox.
+The design is adapted from [jacky-motion](https://github.com/Jackywxsz/Jacky-motion) (MIT), keeping its “SRT master clock + confirmation gate” core while reshaping the product flow for BokeBox.
+
+The page generator also follows Jacky-motion's method: lock one style and information primitive first, then use a stable layout skeleton. Each scene has one clear first-glance object instead of a dashboard made of equal cards. Six styles are available: `apple-tech-gradient`, `editorial-magazine`, `sketch-note`, `finance-studio-cards`, `newspaper-evidence`, and `paper-collage`.
 
 ## Generate in the player
 
@@ -29,7 +31,7 @@ Without an LLM key, Motion creates a deterministic base page so preview still wo
 | **S2 Master clock** | Total duration = end of the last optimized cue; the whole timeline uses milliseconds as its single reference |
 | **S3 Storyboard** | Outline segments → beats (boundaries pinned to anchor cue `startMs`); without an outline, split by character weight; last beat is the closing page |
 | **S3.5 P3.5 gate** | Full-coverage check: first beat starts at 0ms, gaps ≤1500ms, no overlapping beats, step ms strictly increasing within the window, closing page aligns with the master clock (±300ms) |
-| **S4 AI page** | AI fills the visual content layer on top of the gated beats |
+| **S4 AI page** | AI locks the style, layout skeleton, and information primitive before filling the visual layer |
 | **S5 Preview / export** | The React player follows audio in real time; `motion.html` remains available for recording |
 
 ## Generate from the player
@@ -42,13 +44,19 @@ The timeline is locked in `motion-timeline.json`; regenerating the AI page does 
 - **broll beat**: large silent gaps (≥1.5 s, common at paragraph breaks / music) first split the surrounding beats at a forced cut point, then are filled with a real broll transition page (large index number + preview title) so the picture never idles while narration pauses; the gate treats broll as a regular beat in coverage checks. Gaps under 1.5 s are normal narration pace and stay inside the beat (automated storyboarding does not split them)
 - **closing beat**: the final recap page whose `endMs` hugs the master clock duration (±300 ms) and freezes on the last frame
 
+### Page and motion rules
+
+- Information primitives are Claim, Contrast, Path, System, and Evidence; each beat chooses one primary primitive.
+- Core beats use the four-part camera language `glance → reconstruct → push → lock` and finish on a screenshot-ready final frame.
+- The style is locked for the episode; AI does not randomly change the visual language between adjacent scenes.
+
 ## HTML player
 
 - **Master clock**: `performance.now()` + `requestAnimationFrame`, no setTimeout chains; catches up by absolute time after a background tab
 - **Gate overlay**: ready → 3-2-1 countdown (leave room before recording)
 - **HUD**: beat dots + current millisecond clock
 - **Keyboard**: `Space` pause/resume · `←` `→` ±5s · `R` restart · `F` fullscreen
-- **Style**: deep navy background with indigo/cyan brand gradient (derived from the jobId), gold accent on the closing page; pure CSS transitions + class toggles, zero external dependencies
+- **Style**: one locked style per episode; product-launch black space, editorial magazine, sketch note, finance studio, evidence newspaper, and paper collage are available; pure CSS transitions + class toggles, zero external dependencies
 
 ## API
 

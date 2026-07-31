@@ -2886,3 +2886,290 @@ html[data-theme="dark"] .qq-lyrics-return {
   .qq-motion-orbit { display: none; }
   .qq-motion-scene-bullets { gap: 5px; }
 }
+
+/* Motion visual language: one primary, one relation, one lock frame. */
+.qq-motion-canvas {
+  --motion-ink: #f5f5f7;
+  --motion-muted: rgba(245,245,247,.58);
+  --motion-rule: rgba(255,255,255,.16);
+  --motion-paper: #090a0c;
+  --motion-accent: #e85d36;
+  isolation: isolate;
+}
+.qq-motion-canvas::before {
+  content: '';
+  position: absolute;
+  z-index: 0;
+  inset: -20%;
+  pointer-events: none;
+  background: radial-gradient(ellipse 46% 54% at 58% 42%, color-mix(in srgb, var(--motion-accent) 10%, transparent), transparent 72%);
+}
+.qq-motion-canvas.motion-style-editorial-magazine {
+  --motion-ink: #171717;
+  --motion-muted: #67635c;
+  --motion-rule: rgba(23,23,23,.18);
+  --motion-paper: #f2eee7;
+  --motion-accent: #b91c1c;
+  color: var(--motion-ink);
+  background: var(--motion-paper);
+}
+.qq-motion-canvas.motion-style-editorial-magazine::before,
+.qq-motion-canvas.motion-style-newspaper-evidence::before {
+  background: repeating-linear-gradient(90deg, transparent 0 13%, rgba(23,23,23,.035) 13.05% 13.1%);
+}
+.qq-motion-canvas.motion-style-sketch-note {
+  --motion-ink: #25231f;
+  --motion-muted: #777067;
+  --motion-rule: rgba(37,35,31,.26);
+  --motion-paper: #f5f1e8;
+  --motion-accent: #d92d20;
+  color: var(--motion-ink);
+  background-color: var(--motion-paper);
+  background-image: linear-gradient(rgba(71,115,143,.09) 1px, transparent 1px), linear-gradient(90deg, rgba(71,115,143,.09) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+.qq-motion-canvas.motion-style-finance-studio-cards {
+  --motion-ink: #ecfeff;
+  --motion-muted: rgba(236,254,255,.56);
+  --motion-rule: rgba(45,212,191,.24);
+  --motion-paper: #071415;
+  --motion-accent: #2dd4bf;
+  background: linear-gradient(135deg, #091b1e, #061012 76%);
+}
+.qq-motion-canvas.motion-style-newspaper-evidence {
+  --motion-ink: #232323;
+  --motion-muted: #6d685e;
+  --motion-rule: rgba(35,35,35,.22);
+  --motion-paper: #ebe5d8;
+  --motion-accent: #b91c1c;
+  color: var(--motion-ink);
+  background: var(--motion-paper);
+}
+.qq-motion-canvas.motion-style-paper-collage {
+  --motion-ink: #211d1a;
+  --motion-muted: #6d6259;
+  --motion-rule: rgba(33,29,26,.2);
+  --motion-paper: #f3ead9;
+  --motion-accent: #e85d36;
+  color: var(--motion-ink);
+  background: #f3ead9;
+}
+.qq-motion-canvas.motion-style-paper-collage::before {
+  inset: 10% 8% 14% 42%;
+  transform: rotate(3deg);
+  background: #f9f2e6;
+  box-shadow: 12px 14px 0 rgba(33,29,26,.1);
+}
+.qq-motion-canvas-top,
+.qq-motion-canvas-footer {
+  color: var(--motion-muted);
+}
+.qq-motion-canvas-top span:first-child {
+  color: var(--motion-accent);
+}
+.qq-motion-scene {
+  grid-template-columns: 9% minmax(0, 1fr);
+  inset: 22% 6% 18%;
+}
+.qq-motion-scene-index {
+  color: var(--motion-accent);
+  font-size: clamp(26px, 5.4vw, 76px);
+  letter-spacing: 0;
+  opacity: .9;
+}
+.qq-motion-scene-copy {
+  max-width: 780px;
+}
+.qq-motion-scene-copy h4 {
+  color: var(--motion-ink);
+  letter-spacing: 0;
+  word-break: keep-all;
+  line-height: 1.12;
+}
+.qq-motion-scene-copy p {
+  color: var(--motion-muted);
+}
+.qq-motion-canvas-footer {
+  border-top: 1px solid var(--motion-rule);
+  padding-top: 8px;
+}
+.qq-motion-canvas.motion-style-editorial-magazine .qq-motion-scene-copy h4,
+.qq-motion-canvas.motion-style-newspaper-evidence .qq-motion-scene-copy h4 {
+  font-family: Georgia, 'Songti SC', 'STSong', serif;
+  font-weight: 800;
+}
+.qq-motion-canvas.motion-style-sketch-note .qq-motion-scene-copy h4 {
+  font-family: 'STKaiti', 'KaiTi', serif;
+  font-weight: 700;
+}
+.qq-motion-canvas.motion-style-paper-collage .qq-motion-scene-copy h4 {
+  font-weight: 850;
+  transform: rotate(-1deg);
+}
+.qq-motion-scene.is-hero .qq-motion-scene-copy h4 {
+  font-size: clamp(24px, 5.1vw, 72px);
+}
+.qq-motion-scene.is-closing .qq-motion-scene-copy h4 {
+  max-width: 620px;
+}
+.qq-motion-scene.is-closing .qq-motion-scene-index {
+  opacity: .2;
+}
+.qq-motion-live-lockup,
+.qq-motion-live-quote,
+.qq-motion-live-number,
+.qq-motion-live-path,
+.qq-motion-live-split,
+.qq-motion-live-layers {
+  margin-top: 5%;
+}
+.qq-motion-live-lockup {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--motion-accent);
+  font: 800 10px var(--font-mono, ui-monospace);
+  letter-spacing: .12em;
+}
+.qq-motion-live-lockup i {
+  display: block;
+  width: 54px;
+  height: 1px;
+  background: var(--motion-accent);
+}
+.qq-motion-live-quote {
+  max-width: 650px;
+  margin-left: 0;
+  padding-left: 16px;
+  border-left: 3px solid var(--motion-accent);
+  color: var(--motion-ink);
+  font-family: Georgia, 'Songti SC', serif;
+  font-size: clamp(14px, 1.75vw, 24px);
+  font-weight: 650;
+  line-height: 1.35;
+}
+.qq-motion-live-number {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  color: var(--motion-accent);
+}
+.qq-motion-live-number strong {
+  font: 800 clamp(34px, 7vw, 100px) var(--font-mono, ui-monospace);
+  letter-spacing: -.05em;
+}
+.qq-motion-live-number span {
+  color: var(--motion-muted);
+  font: 700 10px var(--font-mono, ui-monospace);
+  letter-spacing: .12em;
+}
+.qq-motion-live-path {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: start;
+  max-width: 760px;
+}
+.qq-motion-live-path-item {
+  position: relative;
+  min-width: 0;
+  padding-right: 14px;
+}
+.qq-motion-live-path-item > span {
+  display: block;
+  margin-bottom: 7px;
+  color: var(--motion-accent);
+  font: 700 10px var(--font-mono, ui-monospace);
+}
+.qq-motion-live-path-item strong {
+  display: block;
+  color: var(--motion-ink);
+  font-size: clamp(10px, 1.25vw, 16px);
+  line-height: 1.3;
+}
+.qq-motion-live-path-item > i {
+  position: absolute;
+  top: 5px;
+  left: 35px;
+  right: 12px;
+  height: 1px;
+  background: var(--motion-accent);
+  opacity: .65;
+}
+.qq-motion-live-split {
+  display: grid;
+  grid-template-columns: 1fr 24px 1fr;
+  align-items: stretch;
+  max-width: 700px;
+  border-top: 1px solid var(--motion-rule);
+  border-bottom: 1px solid var(--motion-rule);
+}
+.qq-motion-live-split > div {
+  display: grid;
+  gap: 8px;
+  align-content: center;
+  min-height: 68px;
+  padding: 12px 16px;
+}
+.qq-motion-live-split > div.is-focus {
+  background: color-mix(in srgb, var(--motion-accent) 10%, transparent);
+}
+.qq-motion-live-split small {
+  color: var(--motion-muted);
+  font: 700 9px var(--font-mono, ui-monospace);
+  letter-spacing: .12em;
+}
+.qq-motion-live-split strong {
+  color: var(--motion-ink);
+  font-size: clamp(10px, 1.2vw, 15px);
+}
+.qq-motion-live-split > i {
+  width: 1px;
+  height: 70%;
+  align-self: center;
+  background: var(--motion-rule);
+}
+.qq-motion-live-layers {
+  display: grid;
+  gap: 7px;
+  max-width: 660px;
+}
+.qq-motion-live-layers div {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  gap: 10px;
+  align-items: center;
+  padding: 9px 12px;
+  border-left: 3px solid var(--motion-accent);
+  border-bottom: 1px solid var(--motion-rule);
+}
+.qq-motion-live-layers span {
+  color: var(--motion-accent);
+  font: 700 9px var(--font-mono, ui-monospace);
+}
+.qq-motion-live-layers strong {
+  color: var(--motion-ink);
+  font-size: clamp(10px, 1.2vw, 15px);
+}
+.qq-motion-canvas.motion-style-editorial-magazine .qq-motion-live-quote,
+.qq-motion-canvas.motion-style-newspaper-evidence .qq-motion-live-quote {
+  border-left-width: 4px;
+}
+.qq-motion-canvas.motion-style-sketch-note .qq-motion-live-split,
+.qq-motion-canvas.motion-style-sketch-note .qq-motion-live-layers {
+  border-style: dashed;
+}
+.qq-motion-canvas.motion-style-paper-collage .qq-motion-live-split > div {
+  box-shadow: 4px 5px 0 rgba(33,29,26,.12);
+}
+.qq-motion-scrubber-track {
+  background: color-mix(in srgb, var(--motion-accent) 15%, #fff 5%);
+}
+.qq-motion-scrubber-track button.is-active {
+  background: color-mix(in srgb, var(--motion-accent) 40%, transparent);
+}
+.qq-motion-scrubber-track > i {
+  background: var(--motion-accent);
+}
+.qq-motion-scrubber-labels {
+  color: var(--motion-muted);
+}

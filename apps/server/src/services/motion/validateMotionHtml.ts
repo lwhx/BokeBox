@@ -30,7 +30,7 @@ const RUNTIME_MARKERS = [
  */
 export function validateMotionHtml(html: string, timeline: MotionTimeline): MotionHtmlValidation {
   const errors: string[] = [];
-  const beatSections = html.match(/<section class="beat[^"]*" id="[^"]+" data-kind="[^"]+" data-steps="\d+" data-start-ms="\d+" data-end-ms="\d+" data-step-times="[^"]*">/g) || [];
+  const beatSections = html.match(/<section class="beat[^"]*"[^>]*data-kind="[^"]+"[^>]*data-steps="\d+"[^>]*data-start-ms="\d+"[^>]*data-end-ms="\d+"[^>]*data-step-times="[^"]*">/g) || [];
   const beatsFound = beatSections.length;
   const timelineBeats = timeline.beats.length;
 

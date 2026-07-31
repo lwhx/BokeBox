@@ -331,6 +331,17 @@ function beatHtml(input: {
     .join('');
   const isClosing = input.kind === 'closing';
   const isBroll = input.kind === 'broll';
+  const visual = input.scene?.visual || (isClosing ? 'quote-lock' : steps.length > 1 ? 'path-build' : 'claim-lockup');
+  const primitive = input.scene?.primitive || (steps.length > 1 ? 'Path' : 'Claim');
+  const layoutSkeleton = input.scene?.layout === 'closing'
+    ? 'L02'
+    : input.scene?.layout === 'split'
+      ? 'L03'
+      : input.scene?.layout === 'steps'
+        ? 'L04'
+        : input.scene?.layout === 'quote'
+          ? 'L02'
+          : 'L01';
   const kicker = input.scene?.eyebrow || (isBroll
     ? 'B-ROLL'
     : isClosing
@@ -340,24 +351,93 @@ function beatHtml(input: {
   const brollIndex = isBroll
     ? `<div class="broll-index">${String(parseInt(input.id.replace(/\D+/gu, ''), 10) || 1).padStart(2, '0')}</div>`
     : '';
+  const visualHtml = visual === 'number-count'
+    ? `<div class="scene-number step step-lock"><strong>${String(steps.length || 1).padStart(2, '0')}</strong><span>KEY POINTS</span></div>`
+    : visual === 'quote-lock'
+      ? `<blockquote class="scene-quote step step-lock">${esc(input.scene?.body || sceneTitle)}</blockquote>`
+      : visual === 'split-compare'
+        ? `<div class="scene-split"><div class="step"><small>BEFORE</small><strong>${esc(steps[0] || '原来的做法')}</strong></div><i></i><div class="is-focus step"><small>AFTER</small><strong>${esc(steps[1] || sceneTitle)}</strong></div></div>`
+        : visual === 'system-layer-expand'
+          ? `<div class="scene-layers">${steps.slice(0, 3).map((label, i) => `<div class="layer step"><span>${String(i + 1).padStart(2, '0')}</span><strong>${esc(label)}</strong></div>`).join('')}</div>`
+          : `<div class="scene-lockup${visual === 'path-build' ? '' : ' step step-lock'}"><i></i><span>${primitive}</span></div>`;
   return (
     `<section class="${beatClass}" id="${esc(input.id)}" ` +
     `data-kind="${esc(input.kind)}" data-steps="${steps.length}" ` +
+    `data-layout="${layoutSkeleton}" data-primitive="${esc(primitive)}" data-visual-demo="${esc(visual)}" ` +
     `data-start-ms="${input.startMs}" data-end-ms="${input.endMs}" ` +
     `data-step-times="${input.stepTimes.join(',')}">` +
     `<div class="scene">` +
     `${brollIndex}` +
     `<div class="beat-kicker">${kicker}</div>` +
-    `<h2 class="beat-title">${esc(sceneTitle)}</h2>` +
+    `<h2 class="beat-title" data-safe-box="title">${esc(sceneTitle)}</h2>` +
     (input.scene?.body ? `<p class="beat-body">${esc(input.scene.body)}</p>` : '') +
-    `<div class="beat-steps">${stepNodes}</div>` +
+    `<div class="scene-visual">${visualHtml}</div>` +
+    `<div class="beat-steps visual-${esc(visual)}">${stepNodes}</div>` +
     `</div></section>`
   );
+}
+
+/** Jacky-motion 风格的页面层：风格 token + 信息原语 + 舒展构图。 */
+function richMotionCss(): string {
+  return String.raw`
+body{background:#000}
+body.style-editorial-magazine #stage,body.style-newspaper-evidence #stage,body.style-paper-collage #stage{--ink:#171717;--mute:#6b665e;--rule:rgba(23,23,23,.2);--accent:#b91c1c;background:#f1ede5;color:var(--ink)}
+body.style-sketch-note #stage{--ink:#28231e;--mute:#777067;--rule:rgba(40,35,30,.28);--accent:#d92d20;background-color:#f5f1e8;background-image:linear-gradient(rgba(71,115,143,.09) 1px,transparent 1px),linear-gradient(90deg,rgba(71,115,143,.09) 1px,transparent 1px);background-size:34px 34px;color:var(--ink)}
+body.style-finance-studio-cards #stage{--ink:#ecfeff;--mute:rgba(236,254,255,.58);--rule:rgba(45,212,191,.28);--accent:#2dd4bf;background:linear-gradient(135deg,#091b1e,#061012 76%);color:var(--ink)}
+body.style-paper-collage #stage{--ink:#211d1a;--mute:#6d6259;--rule:rgba(33,29,26,.2);--accent:#e85d36;background:#f3ead9;color:var(--ink)}
+body.style-editorial-magazine #stage::before,body.style-newspaper-evidence #stage::before{content:"";position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent 0 13%,rgba(23,23,23,.035) 13.05% 13.1%);pointer-events:none}
+body.style-sketch-note #stage::before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 20% 30%,rgba(217,45,32,.05),transparent 22%);pointer-events:none}
+.scene{justify-content:center;padding:116px 150px 150px;z-index:1}
+.beat-kicker{position:relative;z-index:2;margin-bottom:30px;color:var(--accent,var(--c1));font:700 22px/1.2 var(--font-mono,ui-monospace);letter-spacing:.12em}
+.beat-kicker::before{background:var(--accent,var(--c1));width:44px;height:2px}
+.beat-title{position:relative;z-index:2;margin-bottom:26px;max-width:1250px;color:var(--ink,var(--text));font-size:112px;line-height:1.1;letter-spacing:0;font-weight:650;word-break:keep-all;text-wrap:balance}
+.beat-body{position:relative;z-index:2;margin:0 0 34px;max-width:820px;color:var(--mute,var(--text));font-size:28px;line-height:1.5}
+.scene-visual{position:relative;z-index:2;max-width:1180px;margin-top:4px}
+.beat-steps{position:relative;z-index:2;max-width:1180px;margin-top:38px;display:grid;gap:18px}
+.beat-steps.visual-path-build{grid-template-columns:repeat(4,minmax(0,1fr));gap:0;align-items:start}
+.beat-steps.visual-path-build .step{position:relative;border:0;border-top:2px solid var(--accent,var(--c1));border-radius:0;background:transparent;padding:16px 24px 0 0;opacity:0;transform:translateY(18px)}
+.js .beat-steps.visual-path-build .step.on{opacity:1;transform:none;transition:opacity .65s cubic-bezier(.16,1,.3,1),transform .65s cubic-bezier(.16,1,.3,1)}
+.beat-steps.visual-path-build .step::after{content:"";position:absolute;top:-7px;left:0;width:11px;height:11px;border-radius:50%;background:var(--accent,var(--c1));box-shadow:0 0 0 5px color-mix(in srgb,var(--accent,var(--c1)) 18%,transparent)}
+.beat-steps.visual-path-build .step-marker{display:block;margin-bottom:10px;color:var(--accent,var(--c1));font-size:18px}
+.beat-steps.visual-path-build .step-text{color:var(--ink,var(--text));font-size:26px;line-height:1.35}
+.beat-steps:not(.visual-path-build){display:none}
+.scene-lockup{display:flex;align-items:center;gap:15px;color:var(--accent,var(--c1));font:700 18px var(--font-mono,ui-monospace);letter-spacing:.12em}
+.scene-lockup i{display:block;width:72px;height:2px;background:var(--accent,var(--c1))}
+.scene-quote{max-width:980px;margin:20px 0 0;padding-left:28px;border-left:5px solid var(--accent,var(--c1));color:var(--ink,var(--text));font:650 54px/1.28 Georgia,'Songti SC',serif}
+.scene-number{display:flex;align-items:baseline;gap:20px;margin:8px 0 0;color:var(--accent,var(--c1))}
+.scene-number strong{font:650 260px/.9 var(--font-mono,ui-monospace);letter-spacing:-.06em}
+.scene-number span{font:700 20px var(--font-mono,ui-monospace);letter-spacing:.12em;color:var(--mute,var(--text))}
+.scene-split{display:grid;grid-template-columns:1fr 54px 1fr;max-width:1050px;align-items:stretch;border-top:2px solid var(--rule,rgba(255,255,255,.15));border-bottom:2px solid var(--rule,rgba(255,255,255,.15))}
+.scene-split>div{display:grid;gap:18px;align-content:center;min-height:170px;padding:28px 34px}
+.scene-split>div.is-focus{background:color-mix(in srgb,var(--accent,var(--c1)) 10%,transparent)}
+.scene-split>div small{color:var(--mute,var(--text));font:700 17px var(--font-mono,ui-monospace);letter-spacing:.12em}
+.scene-split>div strong{color:var(--ink,var(--text));font-size:32px;line-height:1.3}
+.scene-split>i{width:2px;height:64%;align-self:center;background:var(--rule,rgba(255,255,255,.15))}
+.scene-layers{display:grid;gap:12px;max-width:950px}
+.scene-layers .layer{display:grid;grid-template-columns:70px 1fr;gap:22px;align-items:center;padding:18px 22px;border-left:5px solid var(--accent,var(--c1));border-bottom:1px solid var(--rule,rgba(255,255,255,.15));background:color-mix(in srgb,var(--accent,var(--c1)) 6%,transparent)}
+.scene-layers .layer span{color:var(--accent,var(--c1));font:700 18px var(--font-mono,ui-monospace)}
+.scene-layers .layer strong{color:var(--ink,var(--text));font-size:31px}
+body.style-editorial-magazine .beat-title,body.style-newspaper-evidence .beat-title{font-family:Georgia,'Songti SC','STSong',serif;font-weight:850}
+body.style-editorial-magazine .beat-title{font-size:124px}
+body.style-sketch-note .beat-title{font-family:'STKaiti','KaiTi',serif;font-weight:700}
+body.style-paper-collage .beat-title{transform:rotate(-1deg);font-weight:850}
+body.style-paper-collage #stage::before{content:"";position:absolute;inset:110px 150px 150px 760px;transform:rotate(3deg);background:#fbf4e7;box-shadow:18px 20px 0 rgba(33,29,26,.12);pointer-events:none}
+body.style-sketch-note .scene-split,body.style-sketch-note .scene-layers{border-style:dashed}
+body.style-sketch-note .scene-split>div,body.style-sketch-note .scene-layers .layer{border-style:dashed}
+body.style-finance-studio-cards .scene-number strong{font-size:320px}
+body.style-finance-studio-cards .scene-layers .layer{background:rgba(45,212,191,.06);border-color:var(--accent)}
+.beat-closing .scene{align-items:center;text-align:center}
+.beat-closing .beat-title{max-width:1320px}
+.beat-closing .scene-quote{margin-left:auto;margin-right:auto;text-align:left}
+.beat-broll .scene{padding:90px 130px}
+@media (max-width:900px){.scene{padding:100px 90px}.beat-title{font-size:76px}.scene-number strong{font-size:170px}.scene-quote{font-size:38px}.scene-split>div strong{font-size:24px}}
+`;
 }
 
 /** 生成单文件 HTML（时间属性由已确认时间轴直接内联） */
 export function renderMotionHtml(timeline: MotionTimeline, jobId: string): string {
   const [c1, c2] = gradientPair(jobId);
+  const pageStyle = timeline.page?.style || 'apple-tech-gradient';
   const beatsHtml = timeline.beats
     .map((beat) =>
       beatHtml({
@@ -468,9 +548,9 @@ body{overflow:hidden;background:var(--bg);color:var(--text);
 <meta charset="utf-8">
 <meta name="viewport" content="width=1920,initial-scale=1">
 <title>${esc(timeline.title)} · Motion</title>
-<style>${css}</style>
+<style>${css}${richMotionCss()}</style>
 </head>
-<body class="js">
+<body class="js style-${esc(pageStyle)}">
 <div id="stage">
 ${beatsHtml}
 <div class="hud">

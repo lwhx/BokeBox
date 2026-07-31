@@ -332,11 +332,28 @@ export interface MotionBeat {
 }
 
 export type MotionSceneLayout = 'hero' | 'split' | 'steps' | 'quote' | 'closing';
+export type MotionPageStyle =
+  | 'apple-tech-gradient'
+  | 'editorial-magazine'
+  | 'sketch-note'
+  | 'finance-studio-cards'
+  | 'newspaper-evidence'
+  | 'paper-collage';
+export type MotionPrimitive = 'Claim' | 'Contrast' | 'Path' | 'System' | 'Evidence';
+export type MotionVisual =
+  | 'claim-lockup'
+  | 'split-compare'
+  | 'path-build'
+  | 'system-layer-expand'
+  | 'number-count'
+  | 'quote-lock';
 
 /** AI 根据口播稿生成的视觉页面内容；时间仍由 MotionBeat/SRT 唯一决定。 */
 export interface MotionScene {
   beatId: string;
   layout: MotionSceneLayout;
+  primitive: MotionPrimitive;
+  visual: MotionVisual;
   eyebrow: string;
   title: string;
   body: string;
@@ -347,6 +364,8 @@ export interface MotionScene {
 export interface MotionPageSpec {
   version: 1;
   source: 'ai' | 'fallback';
+  style: MotionPageStyle;
+  styleReason?: string;
   prompt?: string;
   generatedAt: string;
   scenes: MotionScene[];
