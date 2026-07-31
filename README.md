@@ -118,8 +118,8 @@ Create, listen, and manage assets in one private space.
 | Home | Player |
 | :---: | :---: |
 | <img src="docs/img/home.webp" width="100%" alt="BokeBox home" /> | <img src="docs/img/player.webp" width="100%" alt="BokeBox player" /> |
-| **Flashcards** | **Star Map** |
-| <img src="docs/img/flashcard.webp" width="100%" alt="BokeBox flashcards" /> | <img src="docs/img/starmap.webp" width="100%" alt="BokeBox star map" /> |
+| **Flashcards** | **Topic Graph** |
+| <img src="docs/img/flashcard.webp" width="100%" alt="BokeBox flashcards" /> | <img src="docs/img/starmap.webp" width="100%" alt="BokeBox topic graph" /> |
 
 ### Settings
 
@@ -158,7 +158,7 @@ Create, listen, and manage assets in one private space.
 - Job detail: transcript, script, notes, flashcards, cover, audio
 - Player: progress memory, speed, sleep timer (incl. end of episode)
 - **Motion mode**: 16:9 single-file info animation driven by an SRT master clock — storyboard / steps / closing page pinned to real ms, with a P3.5 timeline gate (see [docs/guide/motion-mode.md](./docs/guide/motion-mode.md))
-- Albums for continuous play; Star Map by tags
+- Albums for continuous play; topic graph by tags
 
 ### Settings center
 - **Voice / Persona / Prompts / AI service / Plugins / Schedules / MCP / Site / Account**

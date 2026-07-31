@@ -295,13 +295,26 @@ export function IconTrackNext(p: IconProps) {
   );
 }
 
-/** 星图 */
+/** 多点 */
 export function IconStars(p: IconProps) {
   return (
     <svg {...base(p)}>
       <path d="M12 3.2 13.3 8.1 18.2 9.4 13.3 10.7 12 15.6 10.7 10.7 5.8 9.4 10.7 8.1 12 3.2z" />
       <path d="M18.6 14.2 19.2 16.5 21.5 17.1 19.2 17.7 18.6 20 18 17.7 15.7 17.1 18 16.5 18.6 14.2z" />
       <path d="M5.8 15.2 6.3 17 8.1 17.5 6.3 18 5.8 19.8 5.3 18 3.5 17.5 5.3 17 5.8 15.2z" />
+    </svg>
+  );
+}
+
+/** 关系图谱 */
+export function IconGraph(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <circle cx="6.2" cy="7" r="2.2" />
+      <circle cx="17.8" cy="5.2" r="2.2" />
+      <circle cx="16.4" cy="17.5" r="2.2" />
+      <circle cx="6.8" cy="17" r="2.2" />
+      <path d="m8.2 7 7.4-1.2M7.2 9l-.4 5.8M9 16.6l5.2.6M16.8 7.3l-.8 7.9" />
     </svg>
   );
 }

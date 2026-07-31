@@ -84,8 +84,8 @@ export function defaultPageSeoCopy(locale?: string): PageSeoCopy {
       description: '浏览私人 AI 播客库，继续收听已制作的节目。',
     },
     tags: {
-      title: '标签星图',
-      description: '在交互星图中按标签探索节目主题。',
+      title: '主题关系图谱',
+      description: '在交互图谱中按标签探索节目主题与共现关系。',
     },
     albums: {
       title: '专辑',

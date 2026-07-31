@@ -63,8 +63,8 @@ Full list: [Features](./features.md).
     <figcaption>Player</figcaption>
   </figure>
   <figure>
-    <img src="/img/starmap.webp" alt="Star Map" />
-    <figcaption>Star Map</figcaption>
+    <img src="/img/starmap.webp" alt="Topic graph" />
+    <figcaption>Topic graph</figcaption>
   </figure>
   <figure>
     <img src="/img/mcp.webp" alt="MCP" />

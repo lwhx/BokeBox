@@ -1,2 +1,2 @@
 export type { TagStar } from './types';
-export { TagUniverse } from './TagUniverse';
+export { TagGraph } from './TagGraph';

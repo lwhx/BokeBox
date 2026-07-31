@@ -92,7 +92,7 @@ docker pull ghcr.io/vastsa/bokebox:latest
 1. **丢进去** —— 视频、链接、文稿，或插件扩展源  
 2. **可选微调** —— 人设、音色、提示词  
 3. **后台跑完** —— 转写 → 口播稿 → TTS → 封面 / 闪卡  
-4. **戴上耳机** —— 播放器 + 专辑 + 星图 + 复习
+4. **戴上耳机** —— 播放器 + 专辑 + 图谱 + 复习
 
 ---
 
@@ -118,8 +118,8 @@ docker pull ghcr.io/vastsa/bokebox:latest
 | 首页 | 播放 |
 | :---: | :---: |
 | <img src="docs/img/home.webp" width="100%" alt="BokeBox 桌面" /> | <img src="docs/img/player.webp" width="100%" alt="BokeBox 播放" /> |
-| **闪卡** | **星图** |
-| <img src="docs/img/flashcard.webp" width="100%" alt="BokeBox 闪卡" /> | <img src="docs/img/starmap.webp" width="100%" alt="BokeBox 星图" /> |
+| **闪卡** | **主题图谱** |
+| <img src="docs/img/flashcard.webp" width="100%" alt="BokeBox 闪卡" /> | <img src="docs/img/starmap.webp" width="100%" alt="BokeBox 主题图谱" /> |
 
 ### 设置中心
 
@@ -158,7 +158,7 @@ docker pull ghcr.io/vastsa/bokebox:latest
 - 任务详情：转写、脚本、笔记、闪卡、封面、音频
 - 沉浸播放器：进度记忆、倍速、睡眠定时（含「播完本集」）
 - **Motion 模式**：把单集变成 SRT 主时钟驱动的 16:9 信息动画（分镜/步骤/收束页绑定真实毫秒点 + P3.5 确认门，见 [docs/guide/motion-mode.md](./docs/guide/motion-mode.md)）
-- 专辑连续收听；星图按标签回到相关节目
+- 专辑连续收听；图谱按标签回到相关节目
 
 ### 设置中心
 - **音色 / 人设 / 提示词 / AI 服务 / 插件 / 订阅 / MCP / 站点 / 账户**

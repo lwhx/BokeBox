@@ -141,7 +141,7 @@ export function toHash(route: Route): string {
   return toPath(route);
 }
 
-/** 路由切换时重置窗口滚动，避免长页滚到底后进入全屏页（星图/播放器）卡在半空 */
+/** 路由切换时重置窗口滚动，避免长页滚到底后进入全屏页（图谱/播放器）卡在半空 */
 export function resetWindowScroll() {
   const x = window.scrollX;
   const y = window.scrollY;

@@ -9,7 +9,7 @@ html {
   /* 防止子元素横向撑出视口（不设 overflow-x，避免打断 sticky） */
   width: 100%;
   max-width: 100%;
-  /* 禁止双击缩放；星图画布单独设 touch-action: none */
+  /* 禁止双击缩放；图谱画布单独设 touch-action: none */
   touch-action: manipulation;
 }
 /* 手动亮色：only light 防止系统暗色自动反色 */

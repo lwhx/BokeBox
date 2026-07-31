@@ -17,7 +17,7 @@ import { LoginPage } from './pages/LoginPage';
 import { SetupPage } from './pages/SetupPage';
 import { useI18n } from './i18n';
 import { PlayerProvider } from './player/PlayerContext';
-import { StarMapLoader } from './components/tags/StarMapLoader';
+import { GraphLoader } from './components/tags/GraphLoader';
 import { PageLoader } from './components/ui/PageLoader';
 
 const TagCloudPage = lazy(() =>
@@ -79,7 +79,7 @@ export default function App() {
     return () => window.removeEventListener('popstate', onPop);
   }, []);
 
-  // 星图是深色全屏页：在懒加载 chunk 前就把 html/body 底色切黑，避免亮色主题闪白
+  // 图谱是全屏页：在懒加载 chunk 前同步路由底色，避免首屏闪色。
   useEffect(() => {
     const root = document.documentElement;
     root.dataset.route = route.name;
@@ -90,7 +90,7 @@ export default function App() {
     };
   }, [route.name]);
 
-  // 路由切换回顶：长页（专辑）滚到底再进星图/播放器时，避免 scrollY 残留导致顶部裁切、底部空白
+  // 路由切换回顶：长页滚到底再进图谱/播放器时，避免 scrollY 残留导致顶部裁切。
   useEffect(() => {
     if ('scrollRestoration' in window.history) {
       window.history.scrollRestoration = 'manual';
@@ -262,10 +262,10 @@ export default function App() {
             fallback={
               <div className="tc-page tc-page-boot" aria-busy="true">
                 <div className="tc-universe">
-                  <div className="tu-stage" aria-hidden>
-                    <div className="tu-vignette" />
+                  <div className="tg-stage" aria-hidden>
+                    <div className="tg-placeholder-grid" />
                   </div>
-                  <StarMapLoader label={t('tags.loading')} />
+                  <GraphLoader label={t('tags.loading')} />
                 </div>
               </div>
             }

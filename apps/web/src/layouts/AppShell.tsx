@@ -3,9 +3,9 @@ import { BrandMark } from '../components/BrandMark';
 import {
   IconAlbum,
   IconGitHub,
+  IconGraph,
   IconLibrary,
   IconSpark,
-  IconStars,
   IconUpload,
 } from '../components/icons';
 import { useI18n } from '../i18n';
@@ -20,8 +20,8 @@ import { navigate, type Route } from '../lib/router';
 
 function prefetchTagCloud() {
   void import('../pages/TagCloudPage');
-  // 星图 three.js 体积大，悬停预取独立 chunk
-  void import('../components/tags/TagUniverse');
+  // 图谱画布独立分包，悬停导航时提前加载。
+  void import('../components/tags/TagGraph');
 }
 
 function prefetchAlbums() {
@@ -118,7 +118,7 @@ export function AppShell({
       label: t('nav.tags'),
       onClick: () => navigate({ name: 'tags' }),
       onIntent: prefetchTagCloud,
-      icon: <IconStars size={16} />,
+      icon: <IconGraph size={16} />,
     },
     {
       id: 'albums',

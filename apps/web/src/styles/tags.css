@@ -1,5 +1,5 @@
-/* 星图 TagCloud / TagUniverse */
-/* ===== Star Map · 星图 ===== */
+/* 主题图谱 TagCloud / TagGraph */
+/* ===== Topic Graph · 主题关系图谱 ===== */
 /* 路由级底色：跟随站点主题（暗=夜空 / 亮=日间深空） */
 html[data-route="tags"],
 html[data-route="tags"] body,
@@ -1821,6 +1821,134 @@ html[data-theme="light"][data-route="tags"] .tc-meta {
 @media (prefers-reduced-motion: reduce) {
   .tc-search,
   .tc-popular-item {
+    transition: none;
+  }
+}
+
+/* ===== Topic Graph · 关系图谱画布 ===== */
+.tg-stage {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: #0b1020;
+}
+
+.tg-stage.is-light {
+  background: #f3f6fb;
+}
+
+.tg-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+  touch-action: none;
+}
+
+.tg-canvas:active {
+  cursor: grabbing;
+}
+
+.tg-placeholder-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(127, 153, 202, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(127, 153, 202, 0.06) 1px, transparent 1px);
+  background-size: 80px 80px;
+  background-position: center;
+}
+
+.tg-placeholder-grid::after {
+  content: '';
+  position: absolute;
+  inset: 15%;
+  border: 1px solid rgba(128, 163, 220, 0.12);
+  border-radius: 50%;
+  box-shadow: 0 0 0 80px rgba(128, 163, 220, 0.025), 0 0 0 160px rgba(128, 163, 220, 0.02);
+}
+
+.tg-loader {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 18px;
+  background: rgba(9, 14, 27, 0.88);
+  color: #dbe7fb;
+  opacity: 1;
+  transition: opacity 320ms ease, visibility 320ms ease;
+  pointer-events: none;
+}
+
+.tg-loader.is-fading {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.tg-loader-grid {
+  position: relative;
+  width: 126px;
+  height: 74px;
+}
+
+.tg-loader-line {
+  position: absolute;
+  height: 1px;
+  transform-origin: left center;
+  background: rgba(129, 176, 255, 0.72);
+  animation: tg-loader-flow 1.4s ease-in-out infinite;
+}
+
+.tg-loader-line-a { top: 24px; left: 26px; width: 70px; transform: rotate(16deg); }
+.tg-loader-line-b { top: 25px; left: 26px; width: 61px; transform: rotate(142deg); animation-delay: 120ms; }
+.tg-loader-line-c { top: 48px; left: 28px; width: 68px; transform: rotate(-28deg); animation-delay: 240ms; }
+
+.tg-loader-node {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border: 2px solid #9ec5ff;
+  border-radius: 50%;
+  background: #203a6c;
+  box-shadow: 0 0 16px rgba(111, 166, 255, 0.65);
+  animation: tg-loader-pulse 1.4s ease-in-out infinite;
+}
+
+.tg-loader-node-a { top: 19px; left: 20px; }
+.tg-loader-node-b { top: 43px; left: 22px; animation-delay: 180ms; }
+.tg-loader-node-c { top: 30px; right: 20px; animation-delay: 360ms; }
+
+.tg-loader p {
+  margin: 0;
+  color: currentColor;
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+}
+
+html[data-theme="light"][data-route="tags"] .tg-loader {
+  background: rgba(245, 248, 252, 0.92);
+  color: #2b466d;
+}
+
+@keyframes tg-loader-flow {
+  0%, 100% { opacity: 0.28; }
+  50% { opacity: 1; }
+}
+
+@keyframes tg-loader-pulse {
+  0%, 100% { transform: scale(0.82); opacity: 0.55; }
+  50% { transform: scale(1.14); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tg-loader-line,
+  .tg-loader-node,
+  .tg-loader {
+    animation: none;
     transition: none;
   }
 }

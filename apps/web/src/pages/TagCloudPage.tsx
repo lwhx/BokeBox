@@ -1,14 +1,14 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { coverImageUrl, fetchAllLibrary } from '../api/client';
-import { StarMapLoader } from '../components/tags/StarMapLoader';
+import { GraphLoader } from '../components/tags/GraphLoader';
 import type { TagStar } from '../components/tags/types';
 
-const TagUniverse = lazy(() =>
-  import('../components/tags/TagUniverse').then((m) => ({ default: m.TagUniverse })),
+const LazyTagGraph = lazy(() =>
+  import('../components/tags/TagGraph').then((m) => ({ default: m.TagGraph })),
 );
 import { CoverArt } from '../components/ui/CoverArt';
 import { EmptyState } from '../components/ui/EmptyState';
-import { IconClose, IconPause, IconPlay, IconSearch, IconStars } from '../components/icons';
+import { IconClose, IconGraph, IconPause, IconPlay, IconSearch } from '../components/icons';
 import { AppShell } from '../layouts/AppShell';
 import { useI18n } from '../i18n';
 import { getToken } from '../lib/auth';
@@ -38,6 +38,9 @@ function buildTagStars(library: LibraryItem[]): TagStar[] {
     .map(([name, items]) => ({ name, count: items.length, items }))
     .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, 'zh-CN'));
 }
+
+const DEFAULT_GRAPH_LIMIT = 56;
+const SEARCH_GRAPH_LIMIT = 96;
 
 export function TagCloudPage({ route }: { route: Route }) {
   const { t } = useI18n();
@@ -89,6 +92,10 @@ export function TagCloudPage({ route }: { route: Route }) {
   }, [query, tags]);
 
   const popularTags = useMemo(() => visibleTags.slice(0, 5), [visibleTags]);
+  const graphTags = useMemo(
+    () => visibleTags.slice(0, query.trim() ? SEARCH_GRAPH_LIMIT : DEFAULT_GRAPH_LIMIT),
+    [query, visibleTags],
+  );
 
   useEffect(() => {
     if (selected && !tags.some((x) => x.name === selected)) {
@@ -128,8 +135,8 @@ export function TagCloudPage({ route }: { route: Route }) {
   const empty = !loading && tags.length === 0;
   const hasStars = tags.length > 0;
   const tagKey = useMemo(
-    () => visibleTags.map((x) => `${x.name}:${x.count}`).join('|'),
-    [visibleTags],
+    () => graphTags.map((x) => `${x.name}:${x.count}`).join('|'),
+    [graphTags],
   );
   const sceneReady = hasStars && readyKey === tagKey;
   // 初次进入：数据请求或场景未就绪时展示加载动画
@@ -170,27 +177,28 @@ export function TagCloudPage({ route }: { route: Route }) {
         <div className="tc-universe">
           {!empty && hasStars ? (
             <Suspense fallback={null}>
-            <TagUniverse
-              tags={visibleTags}
+            <LazyTagGraph
+              tags={graphTags}
               selected={selected}
               onSelect={setSelected}
               onReady={handleSceneReady}
+              ariaLabel={t('tags.graphAria')}
             />
             </Suspense>
           ) : (
-            <div className="tu-stage" aria-hidden>
-              <div className="tu-vignette" />
+            <div className="tg-stage" aria-hidden>
+              <div className="tg-placeholder-grid" />
             </div>
           )}
 
           {showLoader && (
-            <StarMapLoader label={t('tags.loading')} fading={loaderFading} />
+            <GraphLoader label={t('tags.loading')} fading={loaderFading} />
           )}
 
           <header className="tc-hud-top">
             <div className="tc-title-block">
               <div className="tc-kicker-row">
-                <span className="tc-kicker-mark"><IconStars size={14} /></span>
+                <span className="tc-kicker-mark"><IconGraph size={14} /></span>
                 <span className="tc-kicker">{t('tags.kicker')}</span>
               </div>
               <h1 className="tc-title">
@@ -238,7 +246,7 @@ export function TagCloudPage({ route }: { route: Route }) {
               <div className="tc-explorer-divider" />
               <div className="tc-popular-title">
                 <span>{t('tags.popular')}</span>
-                <span>{visibleTags.length}/{tags.length}</span>
+                <span>{graphTags.length}/{visibleTags.length}</span>
               </div>
               <div className="tc-popular-list">
                 {popularTags.map((tag, index) => (
@@ -255,7 +263,7 @@ export function TagCloudPage({ route }: { route: Route }) {
                 ))}
               </div>
               <div className="tc-explorer-foot">
-                <IconStars size={14} />
+                <IconGraph size={14} />
                 <span>{t('tags.mapLegend')}</span>
               </div>
             </aside>
@@ -277,7 +285,7 @@ export function TagCloudPage({ route }: { route: Route }) {
           {empty && (
             <div className="tc-empty">
               <EmptyState
-                icon={<IconStars size={22} />}
+                icon={<IconGraph size={22} />}
                 title={t('tags.emptyTitle')}
                 description={t('tags.emptyDesc')}
                 actionLabel={t('tags.emptyAction')}

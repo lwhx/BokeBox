@@ -49,7 +49,7 @@ export async function fetchLibrary(
   };
 }
 
-/** 拉全部曲库（标签星图 / 播放队列） */
+/** 拉全部曲库（标签图谱 / 播放队列） */
 export async function fetchAllLibrary(
   params: Omit<ListQuery, 'page' | 'pageSize'> & {
     filter?: LibraryListFilter;

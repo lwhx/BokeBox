@@ -44,7 +44,7 @@ Aligned with Settings, job detail, and the listening library.
 - Player: progress memory, speed, sleep timer (incl. “end of episode”)  
 - **Motion mode**: turn an episode into a 16:9 info animation driven by an SRT master clock (P3.5 timeline gate + single-file HTML export; see [Motion mode](motion-mode.md))
 - Albums & continuous play  
-- Star map by theme, with topic search, popular-topic shortcuts, and shared-topic links
+- Topic graph by theme, with topic search, popular-topic shortcuts, and shared-topic links
 - Library coexists with production jobs  
 
 ## Settings

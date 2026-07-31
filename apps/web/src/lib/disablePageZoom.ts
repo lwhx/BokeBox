@@ -1,13 +1,13 @@
 /**
  * 全局禁止浏览器页面缩放。
- * 星图（.tu-canvas / .tc-universe）仍允许内部手势交互（OrbitControls 缩放）。
+ * 图谱（.tg-canvas / .tc-universe）仍允许内部手势交互（画布缩放）。
  */
 
-const STAR_MAP_ZOOM_SELECTOR = '.tu-canvas, .tc-universe, .tu-stage';
+const GRAPH_ZOOM_SELECTOR = '.tg-canvas, .tc-universe, .tg-stage';
 
-function isStarMapTarget(target: EventTarget | null): boolean {
+function isGraphTarget(target: EventTarget | null): boolean {
   if (!(target instanceof Element)) return false;
-  return Boolean(target.closest(STAR_MAP_ZOOM_SELECTOR));
+  return Boolean(target.closest(GRAPH_ZOOM_SELECTOR));
 }
 
 /**
@@ -15,21 +15,21 @@ function isStarMapTarget(target: EventTarget | null): boolean {
  */
 export function initDisablePageZoom(): () => void {
   // 触控板捏合 / Ctrl+滚轮：拦截浏览器级缩放。
-  // 不 stopPropagation，星图 OrbitControls 仍可读 wheel 做场景缩放。
+  // 不 stopPropagation，让图谱画布继续读取 wheel 做缩放。
   const onWheel = (e: WheelEvent) => {
     if (e.ctrlKey || e.metaKey) {
       e.preventDefault();
     }
   };
 
-  // iOS / Safari 页面手势缩放（始终拦截；星图用 touch 事件缩放）
+  // iOS / Safari 页面手势缩放（始终拦截；图谱用 touch 事件缩放）
   const onGesture = (e: Event) => {
     e.preventDefault();
   };
 
-  // 非星图区域：多指触控禁止，避免整页 pinch zoom
+  // 非图谱区域：多指触控禁止，避免整页 pinch zoom
   const onTouchMove = (e: TouchEvent) => {
-    if (isStarMapTarget(e.target)) return;
+    if (isGraphTarget(e.target)) return;
     if (e.touches.length > 1) {
       e.preventDefault();
       return;
