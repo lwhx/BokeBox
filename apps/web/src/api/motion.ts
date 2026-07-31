@@ -34,6 +34,10 @@ export interface MotionBuildResponse {
   message?: string;
 }
 
+export interface MotionGenerateResponse extends MotionBuildResponse {
+  timeline: MotionTimeline | null;
+}
+
 export interface MotionTimelineResponse {
   ok: boolean;
   hasTimeline: boolean;
@@ -60,6 +64,18 @@ export function fetchMotionTimeline(jobId: string): Promise<MotionTimelineRespon
 export function draftMotionTimeline(jobId: string): Promise<MotionDraftResponse> {
   return request<MotionDraftResponse>(`/jobs/${encodeURIComponent(jobId)}/motion/draft`, {
     method: 'POST',
+  });
+}
+
+/** 根据口播稿调用 AI 生成页面并保存，时间轴仍由 SRT 主时钟固定。 */
+export function generateMotionPage(
+  jobId: string,
+  prompt?: string,
+): Promise<MotionGenerateResponse> {
+  return request<MotionGenerateResponse>(`/jobs/${encodeURIComponent(jobId)}/motion/generate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt: prompt?.trim() || undefined }),
   });
 }
 

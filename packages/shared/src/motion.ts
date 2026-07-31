@@ -331,6 +331,27 @@ export interface MotionBeat {
   brollSilence?: { gapStartMs: number; gapEndMs: number };
 }
 
+export type MotionSceneLayout = 'hero' | 'split' | 'steps' | 'quote' | 'closing';
+
+/** AI 根据口播稿生成的视觉页面内容；时间仍由 MotionBeat/SRT 唯一决定。 */
+export interface MotionScene {
+  beatId: string;
+  layout: MotionSceneLayout;
+  eyebrow: string;
+  title: string;
+  body: string;
+  bullets: string[];
+  accent: string;
+}
+
+export interface MotionPageSpec {
+  version: 1;
+  source: 'ai' | 'fallback';
+  prompt?: string;
+  generatedAt: string;
+  scenes: MotionScene[];
+}
+
 export interface MotionTimeline {
   version: 1;
   jobId: string;
@@ -340,6 +361,8 @@ export interface MotionTimeline {
   srtCueCount: number;
   optimizedCueCount: number;
   beats: MotionBeat[];
+  /** 可选视觉页面层，旧时间轴仍可正常读取。 */
+  page?: MotionPageSpec;
   createdAt?: string;
 }
 

@@ -540,7 +540,13 @@ export function ListenPlayerPage({ id, route: _route }: { id: string; route: Rou
             )}
 
             {panel === 'motion' && (
-              <MotionPanel jobId={job.id} />
+              <MotionPanel
+                jobId={job.id}
+                currentSec={player.current}
+                durationSec={player.duration}
+                playing={player.playing}
+                onSeek={player.seekTo}
+              />
             )}
           </div>
         </div>

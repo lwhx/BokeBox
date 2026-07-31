@@ -13,6 +13,7 @@
  */
 import {
   formatMotionClock,
+  type MotionScene,
   type MotionTimeline,
 } from '@bokebox/shared';
 import { jobPaths } from '../../utils/paths.js';
@@ -307,12 +308,16 @@ function beatHtml(input: {
   startMs: number;
   endMs: number;
   stepTimes: number[];
+  scene?: MotionScene;
 }): string {
+  const sceneTitle = input.scene?.title || input.title;
   const steps = input.kind === 'broll'
     ? []
-    : input.stepLabels.length
+    : input.scene?.bullets?.length
+      ? input.scene.bullets
+      : input.stepLabels.length
       ? input.stepLabels
-      : [input.title];
+      : [sceneTitle];
   const stepNodes = steps
     .map((label, i) => {
       const isLast = i === steps.length - 1;
@@ -326,11 +331,11 @@ function beatHtml(input: {
     .join('');
   const isClosing = input.kind === 'closing';
   const isBroll = input.kind === 'broll';
-  const kicker = isBroll
+  const kicker = input.scene?.eyebrow || (isBroll
     ? 'B-ROLL'
     : isClosing
       ? '收束 · 总结'
-      : `章节 ${input.cueRange[0]}–${input.cueRange[1]}`;
+      : `章节 ${input.cueRange[0]}–${input.cueRange[1]}`);
   const beatClass = `beat${isClosing ? ' beat-closing' : ''}${isBroll ? ' beat-broll' : ''}`;
   const brollIndex = isBroll
     ? `<div class="broll-index">${String(parseInt(input.id.replace(/\D+/gu, ''), 10) || 1).padStart(2, '0')}</div>`
@@ -343,7 +348,8 @@ function beatHtml(input: {
     `<div class="scene">` +
     `${brollIndex}` +
     `<div class="beat-kicker">${kicker}</div>` +
-    `<h2 class="beat-title">${esc(input.title)}</h2>` +
+    `<h2 class="beat-title">${esc(sceneTitle)}</h2>` +
+    (input.scene?.body ? `<p class="beat-body">${esc(input.scene.body)}</p>` : '') +
     `<div class="beat-steps">${stepNodes}</div>` +
     `</div></section>`
   );
@@ -366,6 +372,7 @@ export function renderMotionHtml(timeline: MotionTimeline, jobId: string): strin
         startMs: beat.startMs,
         endMs: beat.endMs,
         stepTimes: beat.stepTimes,
+        scene: timeline.page?.scenes.find((scene) => scene.beatId === beat.id),
       }),
     )
     .join('\n');
@@ -398,6 +405,8 @@ body{overflow:hidden;background:var(--bg);color:var(--text);
 .beat-title{font-size:88px;line-height:1.22;font-weight:700;
   max-width:1500px;word-break:break-word;text-wrap:balance;margin-bottom:64px;
   text-shadow:0 2px 40px rgba(0,0,0,.35)}
+.beat-body{max-width:980px;margin-top:-42px;margin-bottom:54px;
+  font-size:30px;line-height:1.55;color:var(--mute)}
 .beat-steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));
   gap:26px;max-width:1600px}
 .step{display:flex;align-items:center;gap:20px;

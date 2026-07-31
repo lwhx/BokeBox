@@ -3,6 +3,7 @@
  *
  * GET  /jobs/:id/motion/timeline  → 已确认时间轴（含覆盖表 + 门禁状态）
  * POST /jobs/:id/motion/draft     → 优化 SRT + 分镜 + P3.5 门禁预检（不落盘）
+ * POST /jobs/:id/motion/generate  → 根据口播稿调用 AI 生成页面并保存
  * POST /jobs/:id/motion/confirm   → 确认时间轴（门禁通过才落盘）
  * POST /jobs/:id/motion/build     → 用已确认时间轴（重新）装配 HTML
  * GET  /jobs/:id/motion.html      → 下载生成的信息动画 HTML
@@ -21,6 +22,7 @@ import {
   buildFromConfirmed,
   confirmAndBuild,
   draftTimeline,
+  generateAndBuild,
   readConfirmedTimeline,
 } from '../../services/motion/index.js';
 
@@ -94,6 +96,35 @@ export async function motionRoutes(app: FastifyInstance): Promise<void> {
       srtInfo: draft.srtInfo,
     };
   });
+
+  app.post<{ Params: { id: string }; Body: { prompt?: unknown } }>(
+    '/jobs/:id/motion/generate',
+    async (req, reply) => {
+      if (!requireUser(req)) return reply.code(401).send({ error: t(getRequestLocale(req), 'auth.notLoggedIn') });
+      const job = await getJob(req.params.id);
+      if (!job) return reply.code(404).send({ error: t(getRequestLocale(req), 'job.notFound') });
+      const prompt = typeof req.body?.prompt === 'string' ? req.body.prompt.trim().slice(0, 800) : undefined;
+      try {
+        const result = await generateAndBuild(job, prompt);
+        if (!result.ok) {
+          return reply.code(422).send({
+            code: 422,
+            message: t(getRequestLocale(req), 'job.motionGateFailed'),
+            data: { error: result.error || 'gate-failed', gate: result.gate, timeline: result.timeline },
+            errorCode: ApiErrorCode.GATE_FAILED,
+          });
+        }
+        return { ok: true, timeline: result.timeline, html: result.html };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return reply.code(502).send({
+          code: 502,
+          message,
+          errorCode: ApiErrorCode.INTERNAL_ERROR,
+        });
+      }
+    },
+  );
 
   app.post<{ Params: { id: string }; Body: { beats?: unknown } }>(
     '/jobs/:id/motion/confirm',

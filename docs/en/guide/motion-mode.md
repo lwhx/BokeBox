@@ -1,18 +1,25 @@
 ---
-description: Motion mode — turn a finished episode into a 16:9 single-file HTML info animation driven by an SRT master clock; built for playback and screen recording.
+description: Motion mode — generate an AI-driven 16:9 page from the spoken script and preview it online against the SRT master clock.
 ---
 
 # Motion Mode (Info Animation)
 
-Motion mode turns a finished episode (`script` + `script-timing` + `podcast.srt`) into a **16:9 (1920×1080) single-file HTML info animation**: every storyboard beat, step and the closing page is pinned to a real millisecond point, driven by the SRT master clock. It plays in any browser and is ready for screen recording.
+Motion turns a finished podcast episode into a **16:9 online information page**. AI reads the spoken script and outline to create the visual hierarchy, short titles, bullets, and layouts. SRT / `script-timing` remains the single master clock so every scene follows the real narration.
 
-The design is adapted from [jacky-motion](https://github.com/jackywxsz/jacky-motion) (MIT), keeping its "SRT master clock + confirmation gate" core, re-architected for BokeBox (deterministic storyboard, built-in dark editorial style, no LLM dependency).
+The page is previewed directly inside the player. A single-file HTML download remains available as a secondary path for recording and offline sharing.
 
-## When to use
+The design is adapted from [jacky-motion](https://github.com/jackywxsz/jacky-motion) (MIT), keeping its “SRT master clock + confirmation gate” core while reshaping the product flow for BokeBox.
 
-- Turn spoken content into a repeatable visual show (video accounts, podcast trailers, course clips)
-- Record straight from OBS / QuickTime while the scene advances on the speech timeline
-- Ship an offline, dependency-free, single-file animation
+## Generate in the player
+
+1. Open an episode with synthesized audio and a spoken script.
+2. Switch to the **Motion** panel.
+3. Add a visual direction, for example “restrained like an Apple keynote, with three clear takeaways”.
+4. Click **Generate page**. AI reads the script, outline, and fixed timeline.
+5. Play the audio. The page preview, scrubber, and scene list follow it in real time.
+6. Click a scene card to seek. Download HTML only when recording or sharing offline.
+
+Without an LLM key, Motion creates a deterministic base page so preview still works. With an LLM configured, the visual content comes from the AI page generator.
 
 ## Workflow
 
@@ -22,17 +29,12 @@ The design is adapted from [jacky-motion](https://github.com/jackywxsz/jacky-mot
 | **S2 Master clock** | Total duration = end of the last optimized cue; the whole timeline uses milliseconds as its single reference |
 | **S3 Storyboard** | Outline segments → beats (boundaries pinned to anchor cue `startMs`); without an outline, split by character weight; last beat is the closing page |
 | **S3.5 P3.5 gate** | Full-coverage check: first beat starts at 0ms, gaps ≤1500ms, no overlapping beats, step ms strictly increasing within the window, closing page aligns with the master clock (±300ms) |
-| **S4 Assemble** | On gate pass, confirm the timeline (writes `motion-timeline.json`) and assemble the single-file `motion.html` |
-| **S5 Static validation** | String-level re-check: beat count, millisecond points, monotonic steps, runtime markers, unique ids |
+| **S4 AI page** | AI fills the visual content layer on top of the gated beats |
+| **S5 Preview / export** | The React player follows audio in real time; `motion.html` remains available for recording |
 
 ## Generate from the player
 
-1. Open an episode (audio already synthesized)
-2. Switch to the **Motion** panel
-3. Click **Build storyboard (P3.5 precheck)** and review the coverage table: each beat's ms window, core text and step ms points
-4. When the gate passes, click **Confirm timeline**, then **Download motion HTML**
-
-Once confirmed, the timeline is locked (`motion-timeline.json`) and can be re-assembled any number of times without drifting when the pipeline is re-run.
+The timeline is locked in `motion-timeline.json`; regenerating the AI page does not change the original script, audio, or SRT.
 
 ## Storyboard & B-roll
 
@@ -53,6 +55,7 @@ Once confirmed, the timeline is locked (`motion-timeline.json`) and can be re-as
 | Method | Path | Description |
 | --- | --- | --- |
 | GET | `/api/jobs/:id/motion/timeline` | Confirmed timeline & coverage (empty when none) |
+| POST | `/api/jobs/:id/motion/generate` | Generate and save a page from the spoken script |
 | POST | `/api/jobs/:id/motion/draft` | S1→S3.5 precheck; returns coverage table and violations (no persistence) |
 | POST | `/api/jobs/:id/motion/confirm` | Confirm timeline (422 when the gate fails) and assemble HTML |
 | POST | `/api/jobs/:id/motion/build` | Re-assemble from the confirmed timeline |
@@ -65,14 +68,16 @@ Writes require a logged-in user; confirmed artifacts are downloadable by public-
 
 New files in the job directory:
 
-- `motion-timeline.json` — the confirmed timeline (written only when the gate passes)
+- `motion-timeline.json` — the timeline plus AI page spec (written only when the gate passes)
 - `motion.html` — the single-file info animation
 
 ## Relation to jacky-motion
 
 BokeBox's Motion mode is adapted from [jacky-motion](https://github.com/jackywxsz/jacky-motion) (MIT License); generated files keep the original author attribution in the file header. Adaptations:
 
-- Removed the 6-stage LLM style selection; deterministic storyboard with one built-in dark editorial style
+- Keep the SRT master clock and confirmation gate, but make page content AI-driven by the spoken script
+- Make online preview the primary path and HTML download secondary
+- Use a deterministic fallback page when no LLM is configured so preview is never blocked
 - Coverage table / gate rules aligned directly with BokeBox's millisecond TTS timeline
 - Pure logic (parse / optimize / gate) lives in `@bokebox/shared`, shared by server and web to avoid rule drift
 - B-roll implemented as "forced cut + fill": large silences first split the beat, then become broll pages, keeping the gate passable and the picture alive

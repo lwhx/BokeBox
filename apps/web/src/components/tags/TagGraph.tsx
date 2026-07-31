@@ -380,7 +380,6 @@ export function TagGraph({ tags, selected, onSelect, onReady, ariaLabel, classNa
     }
 
     const handlePointerDown = (event: PointerEvent) => {
-      const rect = canvas.getBoundingClientRect();
       drag = { x: event.clientX, y: event.clientY, viewX: view.x, viewY: view.y, moved: false };
       canvas.setPointerCapture(event.pointerId);
       canvas.style.cursor = 'grabbing';

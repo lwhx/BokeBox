@@ -13,18 +13,19 @@ import {
   type CoverageRow,
   type GateResult,
   type MotionBeat,
+  type MotionPageSpec,
   type MotionTimeline,
 } from '@bokebox/shared';
 import { loadOptimizedSrt } from './srtOptimizer.js';
 import { buildStoryboard } from './storyboard.js';
 import {
-  confirmTimeline,
   readConfirmedTimeline,
   runTimelineGate,
 } from './timelineGate.js';
 import { buildMotionHtmlFile, renderMotionHtml } from './motionHtml.js';
 import { validateMotionHtml } from './validateMotionHtml.js';
 import { readScriptTiming } from '../job/scriptTiming.js';
+import { generateMotionPage } from './pageGenerator.js';
 import fs from 'node:fs/promises';
 import { jobPaths } from '../../utils/paths.js';
 
@@ -122,6 +123,7 @@ export interface MotionBuildResult {
 export async function confirmAndBuild(
   job: Job,
   beats: MotionBeat[],
+  page?: MotionPageSpec,
 ): Promise<MotionBuildResult> {
   const srt = await loadOptimizedSrt(job.id);
   if (!srt) {
@@ -140,6 +142,7 @@ export async function confirmAndBuild(
     srtCueCount: srt.rawCues,
     optimizedCueCount: srt.cues.length,
     beats: beats.map((b) => ({ ...b, stepTimes: [...b.stepTimes] })),
+    page,
   };
   const built = await buildMotionHtmlFile(job.id, timeline);
   if (!built.ok) {
@@ -151,6 +154,24 @@ export async function confirmAndBuild(
     gate,
     html: { file: built.file, bytes: built.bytes, title: timeline.title },
   };
+}
+
+/** 根据口播稿生成视觉页面，并沿用同一条 SRT 时间轴完成在线预览产物。 */
+export async function generateAndBuild(
+  job: Job,
+  prompt?: string,
+): Promise<MotionBuildResult> {
+  const draft = await draftTimeline(job);
+  if (!draft.ok || !draft.gate) {
+    return {
+      ok: false,
+      timeline: null,
+      gate: draft.gate,
+      error: draft.error || 'gate-failed',
+    };
+  }
+  const page = await generateMotionPage(job, draft.beats, prompt);
+  return confirmAndBuild(job, draft.beats, page);
 }
 
 /** 用已确认时间轴直接重新装配 HTML（适合重复导出，不改时间轴） */

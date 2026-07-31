@@ -1,18 +1,25 @@
 ---
-description: Motion 模式：把单集播客变成 SRT 主时钟驱动的 16:9 信息动画 HTML，用于播放与录屏。
+description: Motion 模式：根据口播稿生成可在线预览的 16:9 AI 信息页面，并由 SRT 主时钟同步播放。
 ---
 
 # Motion 模式（信息动画）
 
-Motion 模式把已合成的单集（`script` + `script-timing` + `podcast.srt`）变成一页 **16:9（1920×1080）单文件 HTML 信息动画**：分镜、步骤与收束页全部绑定真实毫秒点，由 SRT 主时钟驱动，可直接在浏览器播放、用于屏幕录制。
+Motion 把一集已经合成音频的播客变成一套 **16:9 在线信息页面**：AI 读取口播稿和节目大纲，生成视觉层级、短标题、要点与页面布局；SRT / `script-timing` 仍然是唯一主时钟，保证画面跟随真实口播。
 
-设计参考 [jacky-motion](https://github.com/jackywxsz/jacky-motion)（MIT），保留其「SRT 主时钟 + 确认门」核心思想，并按 BokeBox 的产品形态重新架构（确定性分镜、内置深色编辑风、无 LLM 依赖）。
+页面会直接嵌入播放器预览，不需要先下载 HTML。下载单文件 HTML 仍保留为录屏和离线分发的次要出口。
 
-## 何时使用
+设计参考 [jacky-motion](https://github.com/jackywxsz/jacky-motion)（MIT），保留「SRT 主时钟 + 确认门」核心思想，并按 BokeBox 的产品形态重构。
 
-- 想把口播内容变成可反复观看的视觉节目（视频号 / 播客预告 / 课程片段）
-- 想在 OBS / QuickTime 里直接录屏，画面按口播时间轴自动推进
-- 想要一份离线、零依赖、可分发（单文件）的动画版本
+## 在播放器中生成
+
+1. 打开某集节目，确认已有合成音频和口播稿。
+2. 切换到 **Motion（动效）** 面板。
+3. 在视觉要求输入框里写方向，例如“像 Apple 发布会一样克制，突出三个结论”。
+4. 点击 **生成页面**。AI 会读取本集口播稿、节目大纲和固定时间轴。
+5. 页面生成后，直接播放下方音频；预览画面、进度条和分镜列表会同步切换。
+6. 点击分镜卡片可以跳转音频；需要录屏或离线分发时，再下载 HTML。
+
+没有配置 LLM Key 时，Motion 会生成一套确定性的基础页面，保证仍可预览；配置 LLM 后才会使用 AI 页面内容。
 
 ## 工作流
 
@@ -22,17 +29,12 @@ Motion 模式把已合成的单集（`script` + `script-timing` + `podcast.srt`�
 | **S2 主时钟** | 总时长 = 优化后最后一条 cue 的 `endMs`，全时间轴以毫秒为唯一基准 |
 | **S3 分镜** | 大纲 segment → beat（边界钉在 anchor cue 的 `startMs`），无大纲时按字重均分；末 beat 为收束页；屏幕文字做提炼（去开场白、截断、短于口播） |
 | **S3.5 P3.5 确认门** | 全覆盖检查：首 beat 从 0ms 开始、空档 ≤1500ms、beat 不重叠、step 毫秒点严格递增且在区间内、收束页贴合主时钟（±300ms） |
-| **S4 装配** | 通过门禁后确认时间轴（`motion-timeline.json` 落盘）并装配单文件 `motion.html` |
-| **S5 静态校验** | 字符串级复检：beat 数量、毫秒点、step 单调、运行时标记、id 唯一 |
+| **S4 AI 页面** | AI 只生成视觉内容层，和已经通过门禁的 beat 合并 |
+| **S5 在线预览 / 导出** | React 播放器跟随音频实时显示页面；需要时装配单文件 `motion.html` |
 
 ## 在播放器中生成
 
-1. 打开某集节目（已合成音频）
-2. 切换到 **Motion（动效）** 面板
-3. 点 **生成分镜（P3.5 预检）**，查看覆盖表：每个分镜的毫秒窗口、核心信息、步骤毫秒点
-4. 门禁通过后点 **确认时间轴**，随后可 **下载信息动画**（单文件 HTML）
-
-时间轴一经确认即锁定（`motion-timeline.json`），可反复 **重新装配** 导出，不会因重跑流水线而漂移。
+时间轴一经确认即锁定（`motion-timeline.json`），AI 页面可以反复生成，不会改动原始口播稿、音频或 SRT。
 
 ## 分镜与 B-roll
 
@@ -53,6 +55,7 @@ Motion 模式把已合成的单集（`script` + `script-timing` + `podcast.srt`�
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
 | GET | `/api/jobs/:id/motion/timeline` | 已确认时间轴与覆盖表（无则空） |
+| POST | `/api/jobs/:id/motion/generate` | 根据口播稿调用 AI 生成页面并保存 |
 | POST | `/api/jobs/:id/motion/draft` | S1→S3.5 预检，返回覆盖表与违规（不落盘） |
 | POST | `/api/jobs/:id/motion/confirm` | 确认时间轴（门禁不通过返回 422）并装配 HTML |
 | POST | `/api/jobs/:id/motion/build` | 用已确认时间轴重新装配 |
@@ -70,14 +73,16 @@ Motion 模式把已合成的单集（`script` + `script-timing` + `podcast.srt`�
 
 任务目录下新增：
 
-- `motion-timeline.json`：已确认时间轴（门禁通过才写入）
+- `motion-timeline.json`：时间轴和 AI 页面 spec（门禁通过才写入）
 - `motion.html`：单文件信息动画
 
 ## 与 jacky-motion 的关系
 
 BokeBox 的 Motion 模式改编自 [jacky-motion](https://github.com/jackywxsz/jacky-motion)（MIT License），生成文件的文件头保留原作者署名。改编点：
 
-- 移除 6 阶段 LLM 风格选择，改为确定性分镜 + 内置一种深色编辑风
+- 保留 SRT 主时钟和确认门，将页面内容生成改成口播稿驱动的 AI 页面
+- 在线预览成为主路径，HTML 下载作为次要出口
+- 没有 LLM 配置时使用确定性 fallback 页面，不阻断预览
 - 覆盖表 / 门禁规则与 BokeBox 的 TTS 时间轴（毫秒）直接对齐
 - 纯逻辑（解析 / 优化 / 门禁）放 `@bokebox/shared`，服务端与前端共用，避免规则漂移
 - B-roll 用「强制切分 + 填充」实现：大空档先切开 beat 再生成 broll 页，保证门禁可过且画面不空等

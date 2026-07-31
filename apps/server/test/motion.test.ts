@@ -11,6 +11,7 @@ import {
   validateTimeline,
   type MotionBeat,
 } from '@bokebox/shared';
+import { renderMotionHtml } from '../src/services/motion/motionHtml.js';
 
 const SAMPLE_SRT = `1
 00:00:00,000 --> 00:00:04,200
@@ -216,5 +217,48 @@ describe('motion P3.5 timeline gate', () => {
     const rows = buildCoverageRows(beats);
     assert.equal(rows[0].stepTimes[0], 5500);
     assert.equal(rows[1].kind, 'closing');
+  });
+});
+
+describe('motion AI page layer', () => {
+  it('uses generated scene copy in the standalone HTML export', () => {
+    const timeline = {
+      version: 1 as const,
+      jobId: 'job-motion-page',
+      title: '页面测试',
+      durationMs: 12000,
+      source: 'srt' as const,
+      srtCueCount: 2,
+      optimizedCueCount: 2,
+      beats: [
+        {
+          id: 'b1',
+          kind: 'motion' as const,
+          title: '旧标题',
+          startMs: 0,
+          endMs: 12000,
+          stepTimes: [],
+          cueRange: [1, 2] as [number, number],
+        },
+      ],
+      page: {
+        version: 1 as const,
+        source: 'ai' as const,
+        generatedAt: new Date().toISOString(),
+        scenes: [{
+          beatId: 'b1',
+          layout: 'hero' as const,
+          eyebrow: 'KEY IDEA',
+          title: 'AI 页面标题',
+          body: '根据口播稿生成的补充说明',
+          bullets: ['第一条视觉要点'],
+          accent: '#8b5cf6',
+        }],
+      },
+    };
+    const html = renderMotionHtml(timeline, 'job-motion-page');
+    assert.match(html, /AI 页面标题/);
+    assert.match(html, /根据口播稿生成的补充说明/);
+    assert.match(html, /第一条视觉要点/);
   });
 });
