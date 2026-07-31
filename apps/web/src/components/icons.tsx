@@ -91,6 +91,16 @@ export function IconRefresh(p: IconProps) {
   );
 }
 
+/** 搜索 */
+export function IconSearch(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <circle cx="10.8" cy="10.8" r="6.2" />
+      <path d="m16 16 4.4 4.4" />
+    </svg>
+  );
+}
+
 /** 删除 */
 export function IconTrash(p: IconProps) {
   return (
@@ -364,4 +374,3 @@ export function IconAlbum(p: IconProps) {
     </svg>
   );
 }
-

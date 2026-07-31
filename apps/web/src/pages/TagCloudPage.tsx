@@ -8,7 +8,7 @@ const TagUniverse = lazy(() =>
 );
 import { CoverArt } from '../components/ui/CoverArt';
 import { EmptyState } from '../components/ui/EmptyState';
-import { IconClose, IconPause, IconPlay, IconStars } from '../components/icons';
+import { IconClose, IconPause, IconPlay, IconSearch, IconStars } from '../components/icons';
 import { AppShell } from '../layouts/AppShell';
 import { useI18n } from '../i18n';
 import { getToken } from '../lib/auth';
@@ -46,6 +46,7 @@ export function TagCloudPage({ route }: { route: Route }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
   /** 与当前 tagKey 对齐后才算场景就绪，避免重建时闪黑 */
   const [readyKey, setReadyKey] = useState<string | null>(null);
   const [loaderFading, setLoaderFading] = useState(false);
@@ -80,6 +81,14 @@ export function TagCloudPage({ route }: { route: Route }) {
     () => tags.find((x) => x.name === selected) || null,
     [tags, selected],
   );
+
+  const visibleTags = useMemo(() => {
+    const normalized = query.trim().toLocaleLowerCase();
+    if (!normalized) return tags;
+    return tags.filter((tag) => tag.name.toLocaleLowerCase().includes(normalized));
+  }, [query, tags]);
+
+  const popularTags = useMemo(() => visibleTags.slice(0, 5), [visibleTags]);
 
   useEffect(() => {
     if (selected && !tags.some((x) => x.name === selected)) {
@@ -119,8 +128,8 @@ export function TagCloudPage({ route }: { route: Route }) {
   const empty = !loading && tags.length === 0;
   const hasStars = tags.length > 0;
   const tagKey = useMemo(
-    () => tags.map((x) => `${x.name}:${x.count}`).join('|'),
-    [tags],
+    () => visibleTags.map((x) => `${x.name}:${x.count}`).join('|'),
+    [visibleTags],
   );
   const sceneReady = hasStars && readyKey === tagKey;
   // 初次进入：数据请求或场景未就绪时展示加载动画
@@ -162,7 +171,7 @@ export function TagCloudPage({ route }: { route: Route }) {
           {!empty && hasStars ? (
             <Suspense fallback={null}>
             <TagUniverse
-              tags={tags}
+              tags={visibleTags}
               selected={selected}
               onSelect={setSelected}
               onReady={handleSceneReady}
@@ -180,24 +189,81 @@ export function TagCloudPage({ route }: { route: Route }) {
 
           <header className="tc-hud-top">
             <div className="tc-title-block">
-              <span className="tc-kicker">{t('tags.kicker')}</span>
+              <div className="tc-kicker-row">
+                <span className="tc-kicker-mark"><IconStars size={14} /></span>
+                <span className="tc-kicker">{t('tags.kicker')}</span>
+              </div>
               <h1 className="tc-title">
                 {t('tags.title')}
                 <span className="tc-title-en">{t('tags.titleEn')}</span>
               </h1>
               <p className="tc-sub">
-                {loading
-                  ? t('tags.loading')
-                  : tags.length
-                    ? t('tags.count', { n: tags.length, m: library.length })
-                    : t('tags.emptyHint')}
+                {loading ? t('tags.loading') : t('tags.description')}
               </p>
+            </div>
+            <div className="tc-hud-actions">
+              <label className="tc-search">
+                <IconSearch size={16} />
+                <input
+                  type="search"
+                  value={query}
+                  onChange={(event) => {
+                    const next = event.target.value;
+                    setQuery(next);
+                    if (selected && !tags.some((tag) => tag.name.toLocaleLowerCase().includes(next.trim().toLocaleLowerCase()))) {
+                      setSelected(null);
+                    }
+                  }}
+                  placeholder={t('tags.searchPlaceholder')}
+                  aria-label={t('tags.searchPlaceholder')}
+                />
+              </label>
+              <div className="tc-stat-strip" aria-label={t('tags.count', { n: tags.length, m: library.length })}>
+                <span><b>{tags.length}</b>{t('tags.statsTags')}</span>
+                <span><b>{library.length}</b>{t('tags.statsEpisodes')}</span>
+                <span><b>{tags[0]?.count || 0}</b>{t('tags.statsTop')}</span>
+              </div>
             </div>
           </header>
 
+          {!empty && hasStars && (
+            <aside className="tc-explorer" aria-label={t('tags.explorerTitle')}>
+              <div className="tc-explorer-head">
+                <div>
+                  <span className="tc-section-label">{t('tags.explorerTitle')}</span>
+                  <p>{t('tags.explorerDesc')}</p>
+                </div>
+                <span className="tc-explorer-index">01</span>
+              </div>
+              <div className="tc-explorer-divider" />
+              <div className="tc-popular-title">
+                <span>{t('tags.popular')}</span>
+                <span>{visibleTags.length}/{tags.length}</span>
+              </div>
+              <div className="tc-popular-list">
+                {popularTags.map((tag, index) => (
+                  <button
+                    key={tag.name}
+                    type="button"
+                    className={['tc-popular-item', selected === tag.name ? 'is-selected' : ''].join(' ')}
+                    onClick={() => setSelected(selected === tag.name ? null : tag.name)}
+                  >
+                    <span className="tc-popular-rank">0{index + 1}</span>
+                    <span className="tc-popular-name">{tag.name}</span>
+                    <span className="tc-popular-count">{tag.count}</span>
+                  </button>
+                ))}
+              </div>
+              <div className="tc-explorer-foot">
+                <IconStars size={14} />
+                <span>{t('tags.mapLegend')}</span>
+              </div>
+            </aside>
+          )}
+
           <div className="tc-hud-bottom">
             <span className="tc-hint">
-              {t('tags.hintDrag')} · <b>{t('tags.hintClick')}</b>
+              <b>{t('tags.mapHint')}</b> · {t('tags.hintClick')}
             </span>
             <span className="tc-meta">
               {selected
