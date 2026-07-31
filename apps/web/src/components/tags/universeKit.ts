@@ -15,6 +15,8 @@ export type StarRuntime = {
   halo: THREE.Mesh;
   spike: THREE.Mesh;
   label: CSS2DObject | null;
+  /** 标签引线（星体 → 标签基线） */
+  leader: THREE.Line | null;
   basePos: THREE.Vector3;
   baseScale: number;
   phase: number;
@@ -47,6 +49,12 @@ export type UniverseTheme = {
   nebulaOpacity: number;
   orbitOpacity: number;
   linkOpacity: number;
+  /** 聚焦连线的强调透明度（选中/悬停时展示的星座线） */
+  linkFocus: number;
+  /** 天球经纬网格线透明度 */
+  gridOpacity: number;
+  /** 银河雾带透明度 */
+  bandOpacity: number;
   selectRing: number;
   selectOuter: number;
   selectTick: number;
@@ -72,7 +80,10 @@ export function resolveUniverseTheme(mode: UniverseMode = detectUniverseMode()):
       dustOpacity: 0.36,
       nebulaOpacity: 0.24,
       orbitOpacity: 0.3,
-      linkOpacity: 0.28,
+      linkOpacity: 0.22,
+      linkFocus: 0.62,
+      gridOpacity: 0.3,
+      bandOpacity: 0.3,
       selectRing: 0x3b7aef,
       selectOuter: 0x2f6ae0,
       selectTick: 0x4f8ef7,
@@ -89,7 +100,10 @@ export function resolveUniverseTheme(mode: UniverseMode = detectUniverseMode()):
     dustOpacity: 0.35,
     nebulaOpacity: 0.22,
     orbitOpacity: 0.28,
-    linkOpacity: 0.14,
+    linkOpacity: 0.12,
+    linkFocus: 0.5,
+    gridOpacity: 0.16,
+    bandOpacity: 0.34,
     selectRing: 0x8fb8ff,
     selectOuter: 0x6ec8ff,
     selectTick: 0xb8d2ff,
@@ -694,3 +708,229 @@ export function setStarVisual(
   s.visual = mode;
 }
 
+
+/* ================= 星图（Celestial Atlas）专用工具 ================= */
+
+/**
+ * 按节目共现把标签星聚成星座：
+ * 优先让「共同出现过的节目」的标签挨在一起，
+ * 不连线的标签用六边形网格摆放，形成自然星群。
+ */
+export function clusterPositions(
+  tags: TagStar[],
+  radius: number,
+): THREE.Vector3[] {
+  const n = tags.length;
+  const out: THREE.Vector3[] = new Array(n);
+  const occupied: THREE.Vector3[] = [];
+  const spot = (u: number, v: number) => {
+    const th = Math.acos(Math.min(1, Math.max(-1, 1 - 2 * u)));
+    const ph = 2 * Math.PI * v;
+    return new THREE.Vector3(
+      Math.sin(th) * Math.cos(ph),
+      Math.cos(th),
+      Math.sin(th) * Math.sin(ph),
+    ).multiplyScalar(radius);
+  };
+  const isFree = (p: THREE.Vector3, r: number) =>
+    occupied.every((q) => q.distanceTo(p) > r);
+
+  const pairIndex = new Map<string, number>();
+  const order: number[] = [];
+  const adj: number[][] = tags.map(() => []);
+  for (let i = 0; i < n; i += 1) {
+    for (let j = i + 1; j < n; j += 1) {
+      const shared = tags[i].items.filter((a) =>
+        tags[j].items.some((b) => b.job.id === a.job.id),
+      ).length;
+      if (shared > 0) {
+        adj[i].push(j);
+        adj[j].push(i);
+        pairIndex.set(`${i}-${j}`, shared);
+      }
+    }
+  }
+  // 关联度最高的标签先落位
+  const deg = adj.map((a) => a.length);
+  order.push(...Array.from({ length: n }, (_, i) => i).sort(
+    (a, b) => deg[b] - deg[a] || tags[b].count - tags[a].count,
+  ));
+
+  const hex = (k: number) => {
+    const ring = Math.round(Math.sqrt((k + 1) / Math.PI));
+    const level = k - (ring * (ring - 1) * Math.PI - Math.PI * 0.5) + 0.5;
+    return spot((ring + level / (Math.PI * 2 * ring)) / (2 * ring), level);
+  };
+
+  for (const idx of order) {
+    let best: THREE.Vector3 | null = null;
+    let bestScore = -Infinity;
+    // 尝试围绕已占位的相邻标签落位
+    for (const j of adj[idx]) {
+      if (!out[j]) continue;
+      for (let t = 0; t < 24; t += 1) {
+        const cand = out[j]
+          .clone()
+          .normalize()
+          .applyAxisAngle(
+            out[j].clone().normalize(),
+            (t / 24) * Math.PI * 2,
+          );
+        const p = cand
+          .multiplyScalar(Math.cos(0.13))
+          .add(out[j].clone().multiplyScalar(Math.sin(0.13)))
+          .normalize()
+          .multiplyScalar(radius);
+        if (isFree(p, 1.35)) {
+          const score = (pairIndex.get(`${Math.min(idx, j)}-${Math.max(idx, j)}`) ?? 0) * 10 - p.length();
+          if (score > bestScore) {
+            bestScore = score;
+            best = p;
+          }
+        }
+      }
+    }
+    if (best) {
+      out[idx] = best;
+      occupied.push(best);
+      continue;
+    }
+    // 无相邻占位 → 六边形铺格子
+    for (let k = 0; k < n * 4 + 60; k += 1) {
+      const p = hex(k);
+      if (isFree(p, 1.5)) {
+        out[idx] = p;
+        occupied.push(p);
+        break;
+      }
+    }
+    if (!out[idx]) {
+      out[idx] = spot(Math.random(), Math.random());
+      occupied.push(out[idx]);
+    }
+  }
+  return out;
+}
+
+/**
+ * 星座连线：共现节目的标签两两相连。
+ * 返回全部候选线段（选择聚焦时由调用方截取高亮）。
+ */
+export function buildLinkPairs(
+  tags: TagStar[],
+  positions: THREE.Vector3[],
+): Array<[number, number]> {
+  const pairs: Array<[number, number]> = [];
+  for (let i = 0; i < tags.length; i += 1) {
+    const setA = new Set(tags[i].items.map((x) => x.job.id));
+    for (let j = i + 1; j < tags.length; j += 1) {
+      if (tags[j].items.some((it) => setA.has(it.job.id))) pairs.push([i, j]);
+    }
+  }
+  // 近距离优先，短线更像星座
+  pairs.sort((a, b) => {
+    const da = positions[a[0]].distanceTo(positions[a[1]]);
+    const db = positions[b[0]].distanceTo(positions[b[1]]);
+    return da - db;
+  });
+  const max = Math.min(pairs.length, Math.max(4, Math.min(40, tags.length)));
+  return pairs.slice(0, max);
+}
+
+/** 天球经纬网格：赤道环 + 经线 + 纬线（静态、低填充） */
+export function makeCelestialGrid(
+  radius: number,
+  color: THREE.Color | number,
+  opacity: number,
+  subtle = false,
+): THREE.Group {
+  const g = new THREE.Group();
+  const c = color instanceof THREE.Color ? color : new THREE.Color(color);
+  const mat = new THREE.LineBasicMaterial({
+    color: c,
+    transparent: true,
+    opacity,
+    depthWrite: false,
+  });
+  const matPole = new THREE.LineBasicMaterial({
+    color,
+    transparent: true,
+    opacity: Math.min(1, opacity * 1.6),
+    depthWrite: false,
+  });
+  const lon = subtle ? 4 : 8;
+  const lat = subtle ? 2 : 3;
+  const seg = 64;
+  for (let i = 0; i < lon; i += 1) {
+    const a = (i / lon) * Math.PI * 2;
+    const pts: THREE.Vector3[] = [];
+    for (let k = 0; k <= seg; k += 1) {
+      const t = (k / seg) * Math.PI;
+      pts.push(
+        new THREE.Vector3(
+          Math.cos(a) * Math.sin(t),
+          Math.cos(t),
+          Math.sin(a) * Math.sin(t),
+        ).multiplyScalar(radius),
+      );
+    }
+    g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), mat));
+  }
+  for (let i = 0; i <= lat; i += 1) {
+    const colat = ((i + 0.5) / (lat + 1)) * Math.PI;
+    const r = radius * Math.sin(colat);
+    const y = radius * Math.cos(colat);
+    const pts: THREE.Vector3[] = [];
+    for (let k = 0; k <= seg; k += 1) {
+      const t = (k / seg) * Math.PI * 2;
+      pts.push(new THREE.Vector3(Math.cos(t) * r, y, Math.sin(t) * r));
+    }
+    g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), mat));
+  }
+  // 天赤道加粗
+  const eq: THREE.Vector3[] = [];
+  for (let k = 0; k <= seg; k += 1) {
+    const t = (k / seg) * Math.PI * 2;
+    eq.push(
+      new THREE.Vector3(Math.cos(t) * radius, 0, Math.sin(t) * radius),
+    );
+  }
+  g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(eq), matPole));
+  return g;
+}
+
+/** 银河雾带：倾斜的宽平面 + 横向渐变的柔和纹理 */
+export function makeBandTexture(
+  stretch = 3,
+): { texture: THREE.Texture; width: number; height: number } {
+  const W = 128;
+  const H = 128;
+  const canvas = document.createElement('canvas');
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    const grad = ctx.createLinearGradient(0, 0, W, 0);
+    grad.addColorStop(0, 'rgba(255,255,255,0)');
+    grad.addColorStop(0.32, 'rgba(255,255,255,0.55)');
+    grad.addColorStop(0.5, 'rgba(255,255,255,0.95)');
+    grad.addColorStop(0.68, 'rgba(255,255,255,0.55)');
+    grad.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+    // 细碎颗粒，模拟尘埃
+    for (let i = 0; i < 900; i += 1) {
+      const x = Math.random() * W;
+      const y = H / 2 + (Math.random() - 0.5) * H * 0.34;
+      const a = 0.04 + Math.random() * 0.12;
+      ctx.fillStyle = `rgba(255,255,255,${a})`;
+      const s = 0.6 + Math.random() * 1.4;
+      ctx.fillRect(x, y, s, s);
+    }
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.ClampToEdgeWrapping;
+  tex.repeat.set(stretch, 1);
+  return { texture: tex, width: W, height: H };
+}

@@ -9,11 +9,13 @@ import {
   ZERO,
   WHITE,
   attachStarShader,
-  buildLinks,
+  buildLinkPairs,
+  clusterPositions,
   colorForTag,
   detectQuality,
   detectUniverseMode,
-  fibSphere,
+  makeBandTexture,
+  makeCelestialGrid,
   makeRadialTexture,
   makeSpaceBgTexture,
   makeSpikeTexture,
@@ -33,6 +35,11 @@ type Props = {
   className?: string;
 };
 
+type UniverseApi = {
+  /** 聚焦星座连线（共现关联） */
+  rebuildFocus: (name: string | null) => void;
+};
+
 export function TagUniverse({ tags, selected, onSelect, onReady, className }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const onSelectRef = useRef(onSelect);
@@ -40,6 +47,7 @@ export function TagUniverse({ tags, selected, onSelect, onReady, className }: Pr
   const selectedRef = useRef(selected);
   const starsRef = useRef<StarRuntime[]>([]);
   const hoverRef = useRef<string | null>(null);
+  const apiRef = useRef<UniverseApi | null>(null);
   const themeModeRef = useRef<UniverseMode>(detectUniverseMode());
 
   const tagKey = useMemo(
@@ -47,7 +55,7 @@ export function TagUniverse({ tags, selected, onSelect, onReady, className }: Pr
     [tags],
   );
 
-  // 跟随站点亮/暗主题重建星图（亮色日间深空 / 暗色夜空）
+  // 跟随站点亮/暗主题重建星图（亮色印谱纸面 / 暗色夜空）
   const [themeMode, setThemeMode] = useState<UniverseMode>(() => detectUniverseMode());
 
   useEffect(() => {
@@ -71,9 +79,9 @@ export function TagUniverse({ tags, selected, onSelect, onReady, className }: Pr
     return () => mo.disconnect();
   }, []);
 
-
   useEffect(() => {
     selectedRef.current = selected;
+    apiRef.current?.rebuildFocus(selected ?? null);
     for (const s of starsRef.current) {
       const active = Boolean(selected && s.name === selected);
       if (s.label) s.label.element.classList.toggle('is-focus', active);
@@ -108,7 +116,6 @@ export function TagUniverse({ tags, selected, onSelect, onReady, className }: Pr
     renderer.setPixelRatio(quality.dpr);
     renderer.setClearColor(theme.bg, 1);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
-    // 避免 ACES/Bloom 卡顿；靠贴图与叠加混合做“发光感”
     renderer.toneMapping = THREE.NoToneMapping;
     wrap.appendChild(renderer.domElement);
     renderer.domElement.className = 'tu-canvas';
@@ -166,7 +173,7 @@ export function TagUniverse({ tags, selected, onSelect, onReady, className }: Pr
     const farPoints = new THREE.Points(farGeo, farMat);
     scene.add(farPoints);
 
-    // 银河带：盘面致密星云
+    // 银河盘面星云
     const milkyGeo = makeStarfield({
       count: quality.milkyStars,
       rMin: 14,
@@ -243,62 +250,26 @@ export function TagUniverse({ tags, selected, onSelect, onReady, className }: Pr
       scene.add(dustPoints);
     }
 
-    // 星云体
-    const nebulaGroup = new THREE.Group();
-    scene.add(nebulaGroup);
-    const nebulaTex = makeRadialTexture(
-      [
-        [0, 'rgba(255,255,255,0.55)'],
-        [0.22, 'rgba(255,255,255,0.28)'],
-        [0.55, 'rgba(255,255,255,0.08)'],
-        [1, 'rgba(255,255,255,0)'],
-      ],
-      256,
-    );
-    const nebulaColors = [0x3d7cff, 0x7c5cff, 0x2fd6cf, 0x5b8dff, 0xa06bff];
-    for (let i = 0; i < quality.nebulae; i += 1) {
-      const mat = new THREE.MeshBasicMaterial({
-        map: nebulaTex,
-        color: nebulaColors[i % nebulaColors.length],
-        transparent: true,
-        opacity: theme.nebulaOpacity * (0.75 + (i % 3) * 0.12),
-        depthWrite: false,
-        blending: theme.mode === 'light' ? THREE.NormalBlending : THREE.AdditiveBlending,
-      });
-      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat);
-      const ang = (i / Math.max(quality.nebulae, 1)) * Math.PI * 2 + 0.4;
-      const rad = 6.5 + (i % 4) * 1.6;
-      const elev = ((i % 5) - 2) * 1.05;
-      mesh.position.set(Math.cos(ang) * rad, elev, Math.sin(ang) * rad * 0.78);
-      mesh.scale.set(10 + (i % 3) * 2.4, 7 + (i % 2) * 2.2, 1);
-      mesh.userData.phase = i * 1.37;
-      mesh.userData.spin = 0.02 + (i % 3) * 0.01;
-      nebulaGroup.add(mesh);
-    }
+    // 天球经纬网格（星表气质）
+    const gridColor = theme.mode === 'light' ? 0x5f7394 : 0x6a86b8;
+    const gridGroup = makeCelestialGrid(14.5, gridColor, theme.gridOpacity, !quality.animateIdle);
+    scene.add(gridGroup);
 
-    // 科技感轨道环（中心参考平面）
-    const orbitGroup = new THREE.Group();
-    scene.add(orbitGroup);
-    for (let i = 0; i < quality.orbitRings; i += 1) {
-      const r = 5.2 + i * 2.1;
-      const curve = new THREE.EllipseCurve(0, 0, r, r * (0.72 + i * 0.04), 0, Math.PI * 2, false, 0);
-      const pts = curve.getPoints(48 + i * 8);
-      const geo = new THREE.BufferGeometry().setFromPoints(
-        pts.map((p) => new THREE.Vector3(p.x, 0, p.y)),
-      );
-      const mat = new THREE.LineBasicMaterial({
-        color: i === 0 ? (theme.mode === 'light' ? 0x4f8ef7 : 0x6aa8ff) : (theme.mode === 'light' ? 0x7aa2ef : 0x5b7cff),
-        transparent: true,
-        opacity: theme.orbitOpacity * (0.45 + i * 0.12),
-        blending: theme.mode === 'light' ? THREE.NormalBlending : THREE.AdditiveBlending,
-        depthWrite: false,
-      });
-      const line = new THREE.LineLoop(geo, mat);
-      line.rotation.x = 0.18 + i * 0.05;
-      line.rotation.z = i * 0.35;
-      line.userData.spin = 0.015 + i * 0.008;
-      orbitGroup.add(line);
-    }
+    // 银河雾带：柔和的光带，点缀夜空 / 印谱纸面
+    const band = makeBandTexture(4);
+    const bandMat = new THREE.MeshBasicMaterial({
+      map: band.texture,
+      color: theme.mode === 'light' ? 0xa9bcd6 : 0xffffff,
+      transparent: true,
+      opacity: theme.bandOpacity,
+      depthWrite: false,
+      blending: theme.mode === 'light' ? THREE.NormalBlending : THREE.AdditiveBlending,
+    });
+    const bandMesh = new THREE.Mesh(new THREE.PlaneGeometry(30, 11), bandMat);
+    bandMesh.position.set(0, -3.6, 0);
+    bandMesh.rotation.x = -1.12;
+    bandMesh.rotation.z = 0.3;
+    scene.add(bandMesh);
 
     const glowTex = makeRadialTexture(
       [
@@ -321,7 +292,6 @@ export function TagUniverse({ tags, selected, onSelect, onReady, className }: Pr
       96,
     );
     const spikeTex = makeSpikeTexture();
-    // 低面数内核
     const coreGeo = new THREE.SphereGeometry(1, 10, 10);
     const planeGeo = new THREE.PlaneGeometry(1, 1);
 
@@ -330,7 +300,8 @@ export function TagUniverse({ tags, selected, onSelect, onReady, className }: Pr
 
     const maxCount = Math.max(1, ...tags.map((t) => t.count));
     const radius = Math.max(4.6, Math.min(10.2, 3.4 + Math.sqrt(Math.max(tags.length, 1)) * 0.95));
-    const positions = tags.map((_, i) => fibSphere(i, Math.max(tags.length, 1), radius));
+    // 星座聚类：共现节目的标签彼此靠近
+    const positions = clusterPositions(tags, radius);
     const runtimes: StarRuntime[] = [];
     const maxLabels = quality.animateIdle ? 20 : 12;
     const topNames = new Set(
@@ -341,14 +312,16 @@ export function TagUniverse({ tags, selected, onSelect, onReady, className }: Pr
     );
     const glowBlend =
       theme.mode === 'light' ? THREE.NormalBlending : THREE.AdditiveBlending;
-    // 低画质隐藏 corona/spike，显著减少 draw call
     const richStars = quality.animateIdle;
+    const leaderColor = theme.mode === 'light' ? 0x46566b : 0xa9c0e8;
+    const topCut = Math.max(2, Math.round(maxCount * 0.22));
 
     const attachLabel = (s: StarRuntime, focused = false) => {
       if (s.label) {
         s.label.visible = true;
         s.label.element.style.display = '';
         s.label.element.classList.toggle('is-focus', focused);
+        if (s.leader) s.leader.visible = true;
         return s.label;
       }
       const el = document.createElement('button');
@@ -377,16 +350,16 @@ export function TagUniverse({ tags, selected, onSelect, onReady, className }: Pr
         onSelectRef.current(next);
       });
       const label = new CSS2DObject(el);
-      label.position.set(0, s.baseScale * 1.85, 0);
+      label.position.set(0, s.baseScale * 2.0, 0);
       s.group.add(label);
       s.label = label;
+      if (s.leader) s.leader.visible = true;
       return label;
     };
 
     tags.forEach((tag, i) => {
       const color = colorForTag(tag.name);
       if (theme.mode === 'light') {
-        // 亮底提高饱和与明度差，避免星点发灰
         color.offsetHSL(0, 0.14, -0.04);
       }
       const weight = tag.count / maxCount;
@@ -395,7 +368,6 @@ export function TagUniverse({ tags, selected, onSelect, onReady, className }: Pr
       const group = new THREE.Group();
       group.position.copy(positions[i]);
       group.userData.name = tag.name;
-      // 静态星默认关自动矩阵，位移时再 updateMatrix
       group.matrixAutoUpdate = false;
       group.updateMatrix();
 
@@ -437,6 +409,7 @@ export function TagUniverse({ tags, selected, onSelect, onReady, className }: Pr
       );
       halo.scale.setScalar(baseScale * (theme.mode === 'light' ? 8.0 : 7.4));
 
+      // 衍射十字仅给亮星，数量可控
       const spike = new THREE.Mesh(
         planeGeo,
         new THREE.MeshBasicMaterial({
@@ -449,12 +422,30 @@ export function TagUniverse({ tags, selected, onSelect, onReady, className }: Pr
         }),
       );
       spike.scale.setScalar(baseScale * 11.2);
-      spike.visible = richStars && tag.count > 1;
+      spike.visible = richStars && tag.count >= topCut;
+
+      // 引线：星体 → 标签基线（星表样式）
+      const leaderGeo = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(0, baseScale * 1.0, 0),
+        new THREE.Vector3(0, baseScale * 1.75, 0),
+      ]);
+      const leader = new THREE.Line(
+        leaderGeo,
+        new THREE.LineBasicMaterial({
+          color: leaderColor,
+          transparent: true,
+          opacity: 0,
+          depthWrite: false,
+          blending: theme.mode === 'light' ? THREE.NormalBlending : THREE.AdditiveBlending,
+        }),
+      );
+      leader.visible = false;
 
       group.add(core);
       group.add(corona);
       group.add(halo);
       group.add(spike);
+      group.add(leader);
       root.add(group);
 
       const runtime: StarRuntime = {
@@ -465,6 +456,7 @@ export function TagUniverse({ tags, selected, onSelect, onReady, className }: Pr
         halo,
         spike,
         label: null,
+        leader,
         basePos: positions[i].clone(),
         baseScale,
         phase: (hashSeed(tag.name) % 360) * (Math.PI / 180),
@@ -473,7 +465,6 @@ export function TagUniverse({ tags, selected, onSelect, onReady, className }: Pr
         visual: 'idle',
         lastDim: 1,
       };
-      // 仅热门标签初始挂 CSS2D，避免 N 个 DOM 拖垮主线程
       if (topNames.has(tag.name) || selectedRef.current === tag.name) {
         attachLabel(runtime, selectedRef.current === tag.name);
       }
@@ -489,27 +480,68 @@ export function TagUniverse({ tags, selected, onSelect, onReady, className }: Pr
       attachLabel(s, selectedRef.current === name);
     };
 
-
-    const linkData = quality.animateIdle
-      ? buildLinks(tags, positions)
-      : { positions: [] as number[], colors: [] as number[] };
-    let linkLines: THREE.LineSegments | null = null;
-    if (linkData.positions.length) {
-      const linkGeo = new THREE.BufferGeometry();
-      linkGeo.setAttribute('position', new THREE.Float32BufferAttribute(linkData.positions, 3));
-      linkGeo.setAttribute('color', new THREE.Float32BufferAttribute(linkData.colors, 3));
-      const linkMat = new THREE.LineBasicMaterial({
-        vertexColors: true,
+    // 星座连线：全部候选（底色暗线）+ 选中时的共现高亮
+    let baseLinks: THREE.LineSegments | null = null;
+    let focusLinks: THREE.LineSegments | null = null;
+    const pairs = quality.animateIdle ? buildLinkPairs(tags, positions) : [];
+    if (quality.animateIdle && pairs.length) {
+      const pos: number[] = [];
+      for (const [i, j] of pairs) {
+        pos.push(
+          positions[i].x, positions[i].y, positions[i].z,
+          positions[j].x, positions[j].y, positions[j].z,
+        );
+      }
+      const baseGeo = new THREE.BufferGeometry();
+      baseGeo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      const baseMat = new THREE.LineBasicMaterial({
+        color: theme.mode === 'light' ? 0x9db3cc : 0x7d93b8,
         transparent: true,
         opacity: theme.linkOpacity,
         blending: theme.mode === 'light' ? THREE.NormalBlending : THREE.AdditiveBlending,
         depthWrite: false,
       });
-      linkLines = new THREE.LineSegments(linkGeo, linkMat);
-      root.add(linkLines);
+      baseLinks = new THREE.LineSegments(baseGeo, baseMat);
+      root.add(baseLinks);
+
+      const focusMat = new THREE.LineBasicMaterial({
+        color: theme.mode === 'light' ? 0x2f6ae0 : 0x9ec6ff,
+        transparent: true,
+        opacity: theme.linkFocus,
+        blending: theme.mode === 'light' ? THREE.NormalBlending : THREE.AdditiveBlending,
+        depthWrite: false,
+      });
+      focusLinks = new THREE.LineSegments(new THREE.BufferGeometry(), focusMat);
+      focusLinks.visible = false;
+      root.add(focusLinks);
     }
 
-    // 全息选中环：双环 + 刻度
+    const rebuildFocus = (name: string | null) => {
+      if (!focusLinks) return;
+      const idx = name ? tags.findIndex((t) => t.name === name) : -1;
+      if (idx < 0) {
+        focusLinks.visible = false;
+        return;
+      }
+      const pos: number[] = [];
+      for (const [i, j] of pairs) {
+        if (i === idx || j === idx) {
+          pos.push(
+            positions[i].x, positions[i].y, positions[i].z,
+            positions[j].x, positions[j].y, positions[j].z,
+          );
+        }
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      focusLinks.geometry.dispose();
+      focusLinks.geometry = geo;
+      focusLinks.visible = pos.length > 0;
+    };
+    apiRef.current = { rebuildFocus };
+    rebuildFocus(selectedRef.current ?? null);
+
+    // 细选中环 + 四向刻度
     const selectGroup = new THREE.Group();
     selectGroup.visible = false;
     scene.add(selectGroup);
@@ -522,36 +554,23 @@ export function TagUniverse({ tags, selected, onSelect, onReady, className }: Pr
       depthWrite: false,
       blending: theme.mode === 'light' ? THREE.NormalBlending : THREE.AdditiveBlending,
     });
-    const ringInner = new THREE.Mesh(new THREE.RingGeometry(0.72, 0.78, 40), ringMat);
-    const ringOuter = new THREE.Mesh(
-      new THREE.RingGeometry(0.92, 0.96, 40),
-      new THREE.MeshBasicMaterial({
-        color: theme.selectOuter,
-        transparent: true,
-        opacity: 0,
-        side: THREE.DoubleSide,
-        depthWrite: false,
-        blending: theme.mode === 'light' ? THREE.NormalBlending : THREE.AdditiveBlending,
-      }),
-    );
+    const ringInner = new THREE.Mesh(new THREE.RingGeometry(0.8, 0.86, 48), ringMat);
     selectGroup.add(ringInner);
-    selectGroup.add(ringOuter);
 
-    // 四向刻度
-    const tickGeo = new THREE.PlaneGeometry(0.035, 0.14);
+    const tickGeo = new THREE.PlaneGeometry(0.035, 0.16);
     const tickMat = new THREE.MeshBasicMaterial({
       color: theme.selectTick,
       transparent: true,
       opacity: 0,
       depthWrite: false,
-      blending: THREE.AdditiveBlending,
+      blending: theme.mode === 'light' ? THREE.NormalBlending : THREE.AdditiveBlending,
       side: THREE.DoubleSide,
     });
     const ticks: THREE.Mesh[] = [];
     for (let i = 0; i < 4; i += 1) {
       const tick = new THREE.Mesh(tickGeo, tickMat);
       const a = (i / 4) * Math.PI * 2;
-      tick.position.set(Math.cos(a) * 0.85, Math.sin(a) * 0.85, 0);
+      tick.position.set(Math.cos(a) * 0.83, Math.sin(a) * 0.83, 0);
       tick.rotation.z = a + Math.PI / 2;
       selectGroup.add(tick);
       ticks.push(tick);
@@ -646,11 +665,9 @@ export function TagUniverse({ tags, selected, onSelect, onReady, className }: Pr
           onSelectRef.current(selectedRef.current === name ? null : name);
         }
       }
-      // 不恢复自动旋转，避免空闲持续渲染压力
     };
     const onPointerMove = (e: PointerEvent) => {
       if (performance.now() < ignoreCanvasPickUntil) return;
-      // 拖拽中不刷 hover，减拾取开销
       if (pointerDown) return;
       applyHover(pickName(e.clientX, e.clientY));
     };
@@ -668,7 +685,6 @@ export function TagUniverse({ tags, selected, onSelect, onReady, className }: Pr
     let frame = 0;
     let readyNotified = false;
     const clockStart = performance.now();
-    // 目标帧率：低画质 30fps，中高 36fps
     const frameInterval = quality.animateIdle ? 1000 / 36 : 1000 / 30;
     let lastDraw = 0;
     let animUntil = 0;
@@ -693,7 +709,6 @@ export function TagUniverse({ tags, selected, onSelect, onReady, className }: Pr
     controls.addEventListener('change', () => wake(0));
     controls.addEventListener('end', () => {
       interacting = false;
-      // 阻尼收尾
       wake(900);
     });
 
@@ -710,13 +725,11 @@ export function TagUniverse({ tags, selected, onSelect, onReady, className }: Pr
         dirty || interacting || hasSelection || hasHover || now < animUntil;
 
       if (!keepGoing) {
-        // 真正空闲：停表（官方建议，避免空转 rAF）
         running = false;
         raf = 0;
         return;
       }
 
-      // 帧率上限
       if (now - lastDraw < frameInterval - 0.5) {
         raf = requestAnimationFrame(tick);
         return;
@@ -732,37 +745,15 @@ export function TagUniverse({ tags, selected, onSelect, onReady, className }: Pr
         shaderUniforms.uTime.value = t;
       }
 
-      // 仅交互时微移背景，空闲完全静止
       if (interacting && heavyFrame) {
         farPoints.rotation.y = t * 0.002;
         milkyPoints.rotation.y = t * 0.0015;
-      }
-
-      // 星云 / 轨道：低画质静态 billboard 一次即可
-      if (nebulaGroup.children.length && (quality.animateIdle ? heavyFrame : frame === 1)) {
-        for (const n of nebulaGroup.children) {
-          const mesh = n as THREE.Mesh;
-          mesh.quaternion.copy(camera.quaternion);
-          if (quality.animateIdle) {
-            const phase = Number(mesh.userData.phase || 0);
-            const spin = Number(mesh.userData.spin || 0.02);
-            mesh.rotation.z = phase + t * spin * 0.55;
-          }
-        }
-      }
-      if (quality.animateIdle && heavyFrame) {
-        for (const o of orbitGroup.children) {
-          const line = o as THREE.LineLoop;
-          const spin = Number(line.userData.spin || 0.02);
-          line.rotation.y = t * spin;
-        }
       }
 
       const selectedName = selectedRef.current;
       const hoverName = hoverRef.current;
       let activeStar: StarRuntime | null = null;
 
-      // 无交互时星体视觉更新降到 1/3 帧
       const updateStars = hasSelection || hasHover || heavyFrame || frame <= 2;
       if (updateStars) {
         for (const s of runtimes) {
@@ -770,7 +761,6 @@ export function TagUniverse({ tags, selected, onSelect, onReady, className }: Pr
           const hover = !active && hoverName === s.name;
           if (active) activeStar = s;
 
-          // 浮动：仅中高质量，或当前交互星
           if (active || hover) {
             const floatY = Math.sin(t * 0.9 + s.phase) * (active ? 0.06 : 0.03);
             const floatX = Math.cos(t * 0.55 + s.phase) * (active ? 0.03 : 0.015);
@@ -792,7 +782,13 @@ export function TagUniverse({ tags, selected, onSelect, onReady, className }: Pr
           const dim = selectedName && !active ? 0.72 : 1;
           setStarVisual(s, mode, dim, theme.mode);
 
-          // billboard：交互星每帧，其余重帧
+          if (s.leader) {
+            const shown = Boolean(s.label && s.label.visible && s.label.element.style.display !== 'none');
+            const mat = s.leader.material as THREE.LineBasicMaterial;
+            mat.opacity = shown ? 0.28 + 0.32 * dim : 0;
+            s.leader.visible = shown;
+          }
+
           if (active || hover || heavyFrame) {
             s.corona.quaternion.copy(camera.quaternion);
             s.halo.quaternion.copy(camera.quaternion);
@@ -811,11 +807,9 @@ export function TagUniverse({ tags, selected, onSelect, onReady, className }: Pr
           }
         }
       } else if (selectedName) {
-        // 即便跳过全量更新，也要拿到 active 引用
         activeStar = runtimes.find((s) => s.name === selectedName) || null;
       }
 
-      // 标签深度排序降频
       if (frame % quality.labelSortEvery === 0) {
         root.updateMatrixWorld(true);
         for (const s of runtimes) {
@@ -837,35 +831,28 @@ export function TagUniverse({ tags, selected, onSelect, onReady, className }: Pr
         const sc = Math.max(0.5, activeStar.baseScale * 3.5) * beat;
         selectGroup.scale.setScalar(sc);
         ringMat.opacity = theme.mode === 'light' ? 0.7 : 0.48;
-        (ringOuter.material as THREE.MeshBasicMaterial).opacity =
-          theme.mode === 'light' ? 0.42 : 0.28;
         tickMat.opacity = theme.mode === 'light' ? 0.72 : 0.55;
         selectGroup.rotation.z = t * 0.26;
-        ringOuter.rotation.z = -t * 0.42;
 
         controls.target.lerp(tmp, 0.045);
         camOffset.copy(camera.position).sub(controls.target).normalize().multiplyScalar(9.5);
         desired.copy(tmp).add(camOffset);
         camera.position.lerp(desired, 0.03);
         controls.autoRotate = false;
-        dirty = true; // 选中镜头插值未完成
+        dirty = true;
       } else if (selectGroup.visible) {
         selectGroup.visible = false;
         ringMat.opacity = 0;
-        (ringOuter.material as THREE.MeshBasicMaterial).opacity = 0;
         tickMat.opacity = 0;
         controls.target.lerp(ZERO, 0.025);
         if (controls.target.distanceToSquared(ZERO) > 1e-4) dirty = true;
       }
 
-      // 连线透明度几乎静态，极低频更新
-      if (linkLines && frame % 12 === 0) {
-        const mat = linkLines.material as THREE.LineBasicMaterial;
-        mat.opacity = theme.linkOpacity;
+      if (baseLinks && frame % 12 === 0) {
+        (baseLinks.material as THREE.LineBasicMaterial).opacity = theme.linkOpacity;
       }
 
       renderer.render(scene, camera);
-      // CSS2D 很贵：无交互时每 3 帧一次，有交互每帧
       if (activeStar || hoverName || frame % 3 === 0) {
         labelRenderer.render(scene, camera);
       }
@@ -877,7 +864,6 @@ export function TagUniverse({ tags, selected, onSelect, onReady, className }: Pr
         });
       }
 
-      // 选中镜头 / 交互 / 残留脏标记时继续，否则下一帧由 keepGoing 停表
       if (
         dirty ||
         interacting ||
@@ -913,13 +899,15 @@ export function TagUniverse({ tags, selected, onSelect, onReady, className }: Pr
       renderer.domElement.removeEventListener('pointermove', onPointerMove);
       renderer.domElement.removeEventListener('pointerleave', onPointerLeave);
       controls.dispose();
+      apiRef.current = null;
       starsRef.current = [];
       scene.traverse((obj) => {
         if (
           obj instanceof THREE.Mesh ||
           obj instanceof THREE.Points ||
           obj instanceof THREE.LineSegments ||
-          obj instanceof THREE.LineLoop
+          obj instanceof THREE.LineLoop ||
+          obj instanceof THREE.Line
         ) {
           obj.geometry?.dispose?.();
           const m = obj.material as THREE.Material | THREE.Material[];
@@ -932,7 +920,7 @@ export function TagUniverse({ tags, selected, onSelect, onReady, className }: Pr
       glowTex.dispose();
       coronaTex.dispose();
       spikeTex.dispose();
-      nebulaTex.dispose();
+      band.texture.dispose();
       bgTex.dispose();
       coreGeo.dispose();
       planeGeo.dispose();
@@ -947,12 +935,10 @@ export function TagUniverse({ tags, selected, onSelect, onReady, className }: Pr
   return (
     <div
       ref={wrapRef}
-      className={['tu-stage', `is-${themeMode}`, className].filter(Boolean).join(' ')}
+      className={['tu-stage', `is-${themeMode}`, selected ? 'has-selection' : '', className].filter(Boolean).join(' ')}
       data-universe-theme={themeMode}
     >
       <div className="tu-vignette" aria-hidden />
-      <div className="tu-aurora" aria-hidden />
-      <div className="tu-scan" aria-hidden />
     </div>
   );
 }

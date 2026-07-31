@@ -171,6 +171,7 @@ export const zhCN = {
     finish: '完成并进入工作室',
   },
   tags: {
+    kicker: '天图星表 · 共现关联',
     title: '星图',
     titleEn: 'STAR MAP',
     loading: '正在展开星图…',

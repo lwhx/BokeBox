@@ -264,7 +264,6 @@ export default function App() {
                 <div className="tc-universe">
                   <div className="tu-stage" aria-hidden>
                     <div className="tu-vignette" />
-                    <div className="tu-aurora" />
                   </div>
                   <StarMapLoader label={t('tags.loading')} />
                 </div>

@@ -171,7 +171,6 @@ export function TagCloudPage({ route }: { route: Route }) {
           ) : (
             <div className="tu-stage" aria-hidden>
               <div className="tu-vignette" />
-              <div className="tu-aurora" />
             </div>
           )}
 
@@ -181,6 +180,7 @@ export function TagCloudPage({ route }: { route: Route }) {
 
           <header className="tc-hud-top">
             <div className="tc-title-block">
+              <span className="tc-kicker">{t('tags.kicker')}</span>
               <h1 className="tc-title">
                 {t('tags.title')}
                 <span className="tc-title-en">{t('tags.titleEn')}</span>

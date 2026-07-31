@@ -175,6 +175,7 @@ export const enUS: MessageTree = {
     finish: 'Finish and open studio',
   },
   tags: {
+    kicker: 'Celestial Atlas',
     title: 'Star Map',
     titleEn: 'STAR MAP',
     loading: 'Opening the map…',
