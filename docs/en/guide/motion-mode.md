@@ -27,7 +27,7 @@ Without an LLM key, Motion creates a deterministic base page so preview still wo
 
 | Stage | What happens |
 | --- | --- |
-| **S1 Optimize SRT** | Read `podcast.srt` (fall back to `script-timing.json`), merge fragments, split overlong cues, repair overlaps, report coverage |
+| **S1 Optimize SRT** | Read `podcast.srt`; fall back to `script-timing.json` or embedded job timing, and recover timing from existing audio plus the spoken script when needed; then merge fragments, split overlong cues, repair overlaps, and report coverage |
 | **S2 Master clock** | Total duration = end of the last optimized cue; the whole timeline uses milliseconds as its single reference |
 | **S3 Storyboard** | Outline segments → beats (boundaries pinned to anchor cue `startMs`); without an outline, split by character weight; last beat is the closing page |
 | **S3.5 P3.5 gate** | Full-coverage check: first beat starts at 0ms, gaps ≤1500ms, no overlapping beats, step ms strictly increasing within the window, closing page aligns with the master clock (±300ms) |

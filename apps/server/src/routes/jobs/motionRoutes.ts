@@ -73,7 +73,10 @@ export async function motionRoutes(app: FastifyInstance): Promise<void> {
       // 统一信封 + 详情放 data：门禁违规明细（violations / rows）必须能透传前端
       return reply.code(422).send({
         code: 422,
-        message: t(getRequestLocale(req), 'job.motionGateFailed'),
+        message: t(
+          getRequestLocale(req),
+          draft.error === 'missing-srt' ? 'job.motionSrtMissing' : 'job.motionGateFailed',
+        ),
         data: {
           error: draft.error || 'gate-failed',
           gate: draft.gate,
@@ -109,7 +112,10 @@ export async function motionRoutes(app: FastifyInstance): Promise<void> {
         if (!result.ok) {
           return reply.code(422).send({
             code: 422,
-            message: t(getRequestLocale(req), 'job.motionGateFailed'),
+            message: t(
+              getRequestLocale(req),
+              result.error === 'missing-srt' ? 'job.motionSrtMissing' : 'job.motionGateFailed',
+            ),
             data: { error: result.error || 'gate-failed', gate: result.gate, timeline: result.timeline },
             errorCode: ApiErrorCode.GATE_FAILED,
           });
@@ -144,7 +150,10 @@ export async function motionRoutes(app: FastifyInstance): Promise<void> {
       if (!result.ok) {
         return reply.code(422).send({
           code: 422,
-          message: t(getRequestLocale(req), 'job.motionGateFailed'),
+          message: t(
+            getRequestLocale(req),
+            result.error === 'missing-srt' ? 'job.motionSrtMissing' : 'job.motionGateFailed',
+          ),
           data: { error: result.error || 'gate-failed', gate: result.gate, timeline: result.timeline },
           errorCode: ApiErrorCode.GATE_FAILED,
         });

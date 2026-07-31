@@ -15,7 +15,14 @@ import {
 } from '@bokebox/shared';
 import { jobPaths } from '../../utils/paths.js';
 import { pathExists } from '../../utils/fs.js';
-import { readScriptTiming } from '../job/scriptTiming.js';
+import {
+  buildAlignedScriptTiming,
+  isValidScriptTimingFile,
+  readScriptTiming,
+  writePodcastSrt,
+  writeScriptTiming,
+  type ScriptTimingFile,
+} from '../job/scriptTiming.js';
 
 export type { OptimizedSrt, SrtCue };
 
@@ -35,8 +42,55 @@ export interface SrtSourceInfo {
   optimizedSrtText: string;
 }
 
-/** 读取并优化某 job 的 SRT；数据不完整时返回 null。 */
-export async function loadOptimizedSrt(jobId: string): Promise<SrtSourceInfo | null> {
+export type MotionTimingFallback = {
+  /** 任务记录里残留的旧版内嵌时间轴 */
+  lines?: Array<{ text: string; startSec: number; endSec: number }>;
+  /** 老任务没有落盘时间轴时，用脚本和音频自动补齐 */
+  script?: string;
+  audioPaths?: string[];
+};
+
+async function recoverScriptTiming(
+  jobId: string,
+  fallback?: MotionTimingFallback,
+): Promise<ScriptTimingFile | null> {
+  if (fallback?.lines?.length) {
+    return {
+      version: 1,
+      durationSec: fallback.lines[fallback.lines.length - 1].endSec,
+      source: 'estimated',
+      lines: fallback.lines,
+    };
+  }
+
+  let audioPath: string | undefined;
+  for (const candidate of fallback?.audioPaths || []) {
+    if (candidate && (await pathExists(candidate))) {
+      audioPath = candidate;
+      break;
+    }
+  }
+  if (!fallback?.script?.trim() || !audioPath) return null;
+
+  try {
+    const timing = await buildAlignedScriptTiming({
+      script: fallback.script,
+      audioPath,
+    });
+    if (!isValidScriptTimingFile(timing)) return null;
+    await writeScriptTiming(jobId, timing);
+    await writePodcastSrt(jobId, timing);
+    return timing;
+  } catch {
+    return null;
+  }
+}
+
+/** 读取并优化某 job 的 SRT；缺失时自动恢复可用的口播时间轴。 */
+export async function loadOptimizedSrt(
+  jobId: string,
+  fallback?: MotionTimingFallback,
+): Promise<SrtSourceInfo | null> {
   const paths = jobPaths(jobId);
   let srtText: string | null = null;
   let source: SrtSourceInfo['source'] = 'podcast.srt';
@@ -45,19 +99,19 @@ export async function loadOptimizedSrt(jobId: string): Promise<SrtSourceInfo | n
   if (await pathExists(paths.podcastSrt)) {
     srtText = await fs.readFile(paths.podcastSrt, 'utf8');
   }
-  if (!srtText?.trim()) {
+  let rawCues = srtText?.trim() ? parseSrt(srtText) : [];
+  if (!rawCues.length) {
     const timing = await readScriptTiming(jobId);
-    if (timing?.lines?.length) {
-      rawTimingLines = timing.lines;
+    const recovered = timing || (await recoverScriptTiming(jobId, fallback));
+    if (recovered?.lines?.length) {
+      rawTimingLines = recovered.lines;
       source = 'script-timing';
     }
   }
 
-  const rawCues = srtText?.trim()
-    ? parseSrt(srtText)
-    : rawTimingLines
-      ? cuesFromTiming(rawTimingLines)
-      : [];
+  if (!rawCues.length && rawTimingLines) {
+    rawCues = cuesFromTiming(rawTimingLines);
+  }
 
   if (!rawCues.length) return null;
 

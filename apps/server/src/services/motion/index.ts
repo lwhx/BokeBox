@@ -47,17 +47,30 @@ export interface MotionDraft {
 }
 
 /** 获取某 job 的口播逐行时间轴（用于 cue ↔ 行对齐） */
-async function loadLines(jobId: string): Promise<Array<{ text: string; startSec: number; endSec: number }>> {
-  const timing = await readScriptTiming(jobId);
-  return timing?.lines ?? [];
+function timingFallback(job: Job) {
+  const paths = jobPaths(job.id);
+  return {
+    lines: job.podcast?.scriptTiming,
+    script: job.podcast?.script,
+    audioPaths: [job.podcastAudioPath, paths.podcastMp3, paths.podcastWav].filter(
+      (value): value is string => Boolean(value),
+    ),
+  };
+}
+
+async function loadLines(
+  job: Job,
+): Promise<Array<{ text: string; startSec: number; endSec: number }>> {
+  const timing = await readScriptTiming(job.id, job.podcast?.script);
+  return timing?.lines ?? job.podcast?.scriptTiming ?? [];
 }
 
 /**
  * 生成分镜草稿并跑 P3.5 门禁预检。
- * 不落盘：确认（confirmAndBuild）前用户可在前端审阅覆盖表。
+ * 正常情况下不改动时间轴；老任务缺少文件时，会先恢复可用的口播时间轴。
  */
 export async function draftTimeline(job: Job): Promise<MotionDraft> {
-  const srt = await loadOptimizedSrt(job.id);
+  const srt = await loadOptimizedSrt(job.id, timingFallback(job));
   if (!srt) {
     return {
       ok: false,
@@ -65,13 +78,13 @@ export async function draftTimeline(job: Job): Promise<MotionDraft> {
       rows: [],
       durationMs: 0,
       beats: [],
-      notes: ['没有可用的 SRT 时间轴：请先合成播客音频（TTS 会生成 podcast.srt）。'],
+      notes: ['没有可用的口播时间轴：请先完成音频合成，或重新生成口播时间轴。'],
       srtInfo: null,
       error: 'missing-srt',
     };
   }
 
-  const lines = await loadLines(job.id);
+  const lines = await loadLines(job);
   const outline = job.podcast?.outline?.length ? job.podcast.outline : undefined;
   const story = buildStoryboard({
     title: job.podcast?.title || job.title,
@@ -125,7 +138,7 @@ export async function confirmAndBuild(
   beats: MotionBeat[],
   page?: MotionPageSpec,
 ): Promise<MotionBuildResult> {
-  const srt = await loadOptimizedSrt(job.id);
+  const srt = await loadOptimizedSrt(job.id, timingFallback(job));
   if (!srt) {
     return { ok: false, timeline: null, gate: null, error: 'missing-srt' };
   }

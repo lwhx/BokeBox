@@ -13,6 +13,8 @@ import {
 } from '@bokebox/shared';
 import { renderMotionHtml } from '../src/services/motion/motionHtml.js';
 import { validateMotionHtml } from '../src/services/motion/validateMotionHtml.js';
+import { draftTimeline } from '../src/services/motion/index.js';
+import type { Job } from '@bokebox/shared';
 
 const SAMPLE_SRT = `1
 00:00:00,000 --> 00:00:04,200
@@ -101,6 +103,35 @@ describe('motion srt parse & optimize', () => {
         [3500, 8100],
       ],
     );
+  });
+});
+
+describe('motion timeline recovery', () => {
+  it('uses embedded podcast timing when the legacy SRT file is missing', async () => {
+    const job = {
+      id: 'motion-inline-timing-recovery-test',
+      title: '内嵌时间轴恢复',
+      podcast: {
+        title: '内嵌时间轴恢复',
+        summary: '',
+        tags: [],
+        hostIntro: '',
+        outline: [],
+        script: '第一句。\n第二句。\n第三句。',
+        showNotes: '',
+        estimatedMinutes: 1,
+        scriptTiming: [
+          { text: '第一句', startSec: 0, endSec: 3 },
+          { text: '第二句', startSec: 3, endSec: 6 },
+          { text: '第三句', startSec: 6, endSec: 9 },
+        ],
+      },
+    } as Job;
+
+    const draft = await draftTimeline(job);
+    assert.equal(draft.srtInfo?.source, 'script-timing');
+    assert.equal(draft.durationMs, 9000);
+    assert.equal(draft.error, undefined);
   });
 });
 
