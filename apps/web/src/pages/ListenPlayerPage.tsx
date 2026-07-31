@@ -11,6 +11,7 @@ import { loadAlbumQueue } from '../player/albumQueue';
 import { mergeListenRecord } from '../player/listenProgress';
 import { ScriptFollow } from '../components/listen/ScriptFollow';
 import { FlashcardsView } from '../components/FlashcardsView';
+import { MotionPanel } from '../features/listen-player/MotionPanel';
 import {
   IconBack,
   IconDownload,
@@ -366,6 +367,7 @@ export function ListenPlayerPage({ id, route: _route }: { id: string; route: Rou
       ['notes', t('player.notes')] as const,
       ['flashcards', t('player.flashcards')] as const,
       ['outline', t('player.outline')] as const,
+      ['motion', t('player.motion')] as const,
     ] as Array<readonly [Panel, string]>
   );
 
@@ -535,6 +537,10 @@ export function ListenPlayerPage({ id, route: _route }: { id: string; route: Rou
                   <p className="qq-empty">{t('player.noOutline')}</p>
                 )}
               </ol>
+            )}
+
+            {panel === 'motion' && (
+              <MotionPanel jobId={job.id} />
             )}
           </div>
         </div>

@@ -21,6 +21,11 @@
       "types": "./dist/album.d.ts",
       "import": "./dist/album.js",
       "default": "./dist/album.js"
+    },
+    "./motion": {
+      "types": "./dist/motion.d.ts",
+      "import": "./dist/motion.js",
+      "default": "./dist/motion.js"
     }
   },
   "files": [

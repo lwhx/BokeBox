@@ -6,6 +6,7 @@ import multipart from '@fastify/multipart';
 import { config as loadEnv } from 'dotenv';
 import { fileURLToPath } from 'node:url';
 import { jobRoutes } from './routes/jobs.js';
+import { motionRoutes } from './routes/jobs/motionRoutes.js';
 import { listenRoutes } from './routes/listen.js';
 import { authRoutes, registerAuthGuard } from './routes/auth.js';
 import {
@@ -145,6 +146,7 @@ async function main() {
   registerAuthGuard(app);
   await app.register(settingsRoutes, { prefix: '/api' });
   await app.register(jobRoutes, { prefix: '/api' });
+  await app.register(motionRoutes, { prefix: '/api' });
   await app.register(albumRoutes, { prefix: '/api' });
   await app.register(scheduleRoutes, { prefix: '/api' });
   await app.register(schedulePluginRoutes, { prefix: '/api' });

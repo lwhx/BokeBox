@@ -2431,3 +2431,175 @@ html[data-theme="dark"] .qq-lyrics-return {
     padding: var(--space-1_5) var(--space-2) var(--space-7) var(--space-0_5);
   }
 }
+
+/* ═══════════════════ Motion 面板（P3.5 时间轴确认门） ═══════════════════ */
+.qq-motion {
+  height: 100%;
+  overflow-y: auto;
+  padding: var(--space-1) var(--space-0_5) var(--space-6);
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2_5);
+}
+.qq-motion-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.qq-motion-kicker {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-heavy);
+  letter-spacing: var(--ls-wide);
+  color: var(--brand-2);
+}
+.qq-motion-title {
+  font-size: var(--fs-xl);
+  font-weight: var(--fw-extrabold);
+  color: var(--text);
+  margin: var(--space-0_5) 0 0;
+}
+.qq-motion-desc {
+  margin-top: var(--space-1);
+  font-size: var(--fs-base-plus);
+  line-height: var(--lh-relaxed);
+  color: var(--text-3);
+}
+.qq-motion-gate {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-lg);
+  border: var(--bw-1) solid transparent;
+  font-size: var(--fs-base-plus);
+  font-weight: var(--fw-semibold);
+}
+.qq-motion-gate.is-pass {
+  color: var(--ok-strong, #16a34a);
+  background: color-mix(in srgb, #16a34a 10%, transparent);
+  border-color: color-mix(in srgb, #16a34a 30%, transparent);
+}
+.qq-motion-gate.is-fail {
+  color: var(--danger-strong, #dc2626);
+  background: color-mix(in srgb, #dc2626 10%, transparent);
+  border-color: color-mix(in srgb, #dc2626 30%, transparent);
+}
+.qq-motion-gate-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+.qq-motion-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  font-size: var(--fs-sm);
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+.qq-motion-link {
+  color: var(--brand-2);
+  font-weight: var(--fw-bold);
+  text-decoration: none;
+}
+.qq-motion-notes {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--separator) 30%, transparent);
+  font-size: var(--fs-sm);
+  color: var(--text-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.qq-motion-notes li::before {
+  content: '·';
+  margin-right: var(--space-1);
+  color: var(--brand-2);
+}
+.qq-motion-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+}
+.qq-motion-table th {
+  text-align: left;
+  font-size: var(--fs-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--ls-wide);
+  color: var(--text-3);
+  font-weight: var(--fw-heavy);
+  padding: var(--space-1_5) var(--space-2);
+  border-bottom: var(--bw-1) solid var(--separator);
+  white-space: nowrap;
+}
+.qq-motion-table td {
+  padding: var(--space-1_5) var(--space-2);
+  border-bottom: var(--bw-1) solid color-mix(in srgb, var(--separator) 60%, transparent);
+  vertical-align: top;
+  color: var(--text-2);
+}
+.qq-motion-table tr:last-child td {
+  border-bottom: none;
+}
+.qq-motion-td-id {
+  font-weight: var(--fw-heavy);
+  color: var(--brand-2);
+  font-family: var(--font-mono, ui-monospace, monospace);
+}
+.qq-motion-td-time,
+.qq-motion-td-steps {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.qq-motion-td-core {
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.qq-motion-td-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--text-3);
+}
+.qq-motion-kind {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-bold);
+}
+.qq-motion-kind.is-motion {
+  color: var(--brand-2);
+  background: var(--brand-soft);
+}
+.qq-motion-kind.is-closing {
+  color: var(--ok-strong, #16a34a);
+  background: color-mix(in srgb, #16a34a 12%, transparent);
+}
+.qq-motion-actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+.qq-motion-error {
+  font-size: var(--fs-base-plus);
+  color: var(--danger-strong, #dc2626);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, #dc2626 8%, transparent);
+}
+@media (min-width: 900px) {
+  .qq-motion {
+    padding: var(--space-1_5) var(--space-2) var(--space-7) var(--space-0_5);
+  }
+}

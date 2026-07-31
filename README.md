@@ -157,6 +157,7 @@ Create, listen, and manage assets in one private space.
 ### Assets & listening
 - Job detail: transcript, script, notes, flashcards, cover, audio
 - Player: progress memory, speed, sleep timer (incl. end of episode)
+- **Motion mode**: 16:9 single-file info animation driven by an SRT master clock — storyboard / steps / closing page pinned to real ms, with a P3.5 timeline gate (see [docs/guide/motion-mode.md](./docs/guide/motion-mode.md))
 - Albums for continuous play; Star Map by tags
 
 ### Settings center

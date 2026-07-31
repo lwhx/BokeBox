@@ -109,6 +109,10 @@ export interface JobPaths {
   podcastWav: string;
   /** 默认封面路径（兼容旧 png）；实际多为 cover.webp + 缩略图变体 */
   cover: string;
+  /** Motion 模式：已确认的时间轴（P3.5 确认门产物） */
+  motionTimeline: string;
+  /** Motion 模式：生成的信息动画 HTML */
+  motionHtml: string;
 }
 
 export function jobDir(jobId: string): string {
@@ -152,5 +156,7 @@ export function jobPaths(jobId: string): JobPaths {
     podcastMp3: path.join(dir, 'podcast.mp3'),
     podcastWav: path.join(dir, 'podcast.wav'),
     cover: path.join(dir, 'cover.webp'),
+    motionTimeline: path.join(dir, 'motion-timeline.json'),
+    motionHtml: path.join(dir, 'motion.html'),
   };
 }

@@ -190,6 +190,8 @@ export function mediaTypeOf(filePath: string): string {
   if (ext === '.png') return 'image/png';
   if (ext === '.jpg' || ext === '.jpeg') return 'image/jpeg';
   if (ext === '.webp') return 'image/webp';
+  if (ext === '.html') return 'text/html; charset=utf-8';
+  if (ext === '.srt') return 'application/x-subrip; charset=utf-8';
   return 'application/octet-stream';
 }
 

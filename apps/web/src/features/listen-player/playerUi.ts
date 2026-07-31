@@ -1,4 +1,4 @@
-export type Panel = 'lyrics' | 'notes' | 'flashcards' | 'outline';
+export type Panel = 'lyrics' | 'notes' | 'flashcards' | 'outline' | 'motion';
 
 export const RATES = [0.75, 1, 1.25, 1.5, 1.75, 2] as const;
 
