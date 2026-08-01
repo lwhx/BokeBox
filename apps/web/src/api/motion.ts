@@ -4,7 +4,8 @@ import type {
   MotionBeat,
   MotionTimeline,
 } from '@bokebox/shared/motion';
-import { request } from './http';
+import { getToken } from '../lib/auth';
+import { BASE, request } from './http';
 
 export interface MotionSrtInfo {
   source: 'podcast.srt' | 'script-timing';
@@ -47,13 +48,24 @@ export interface MotionTimelineResponse {
   beats: MotionBeat[];
 }
 
+/** 直链媒体不会经过 fetch，必须显式带 API 前缀与当前会话 token。 */
+function motionMediaUrl(jobId: string, file: string, params: Record<string, string | undefined> = {}): string {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== '') query.set(key, value);
+  }
+  const token = getToken();
+  if (token) query.set('access_token', token);
+  const suffix = query.toString();
+  return `${BASE}/jobs/${encodeURIComponent(jobId)}/${file}${suffix ? `?${suffix}` : ''}`;
+}
+
 export function motionTimelineUrl(jobId: string, download = false): string {
-  const base = `/jobs/${encodeURIComponent(jobId)}/motion.html`;
-  return download ? `${base}?download=1` : base;
+  return motionMediaUrl(jobId, 'motion.html', download ? { download: '1' } : {});
 }
 
 export function motionSrtUrl(jobId: string): string {
-  return `/jobs/${encodeURIComponent(jobId)}/motion.srt?download=1`;
+  return motionMediaUrl(jobId, 'motion.srt', { download: '1' });
 }
 
 /** 已确认时间轴（含覆盖表与门禁状态） */
