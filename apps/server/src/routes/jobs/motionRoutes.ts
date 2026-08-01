@@ -198,10 +198,14 @@ export async function motionRoutes(app: FastifyInstance): Promise<void> {
       if (!(await pathExists(file))) {
         return reply.code(404).send({ error: t(getRequestLocale(req), 'job.motionHtmlMissing') });
       }
-      // 旧版本 HTML 没有声音解锁入口；首次打开时按已确认时间轴补装，避免用户必须重新生成页面。
+      // 旧版本 HTML 可能缺少声音解锁或播放器视觉标记；首次打开时按已确认时间轴补装。
       try {
         const currentHtml = await fs.readFile(file, 'utf8');
-        if (!currentHtml.includes('id="motionAudio"') || !currentHtml.includes('id="audioUnlock"')) {
+        if (
+          !currentHtml.includes('id="motionAudio"') ||
+          !currentHtml.includes('id="audioUnlock"') ||
+          !currentHtml.includes('data-motion-renderer="player-v2"')
+        ) {
           const rebuilt = await buildFromConfirmed(job);
           if (rebuilt.ok && rebuilt.html?.file) {
             file = rebuilt.html.file;

@@ -84,6 +84,9 @@ function runtimeScript(): string {
   var hudDots = document.getElementById('hudDots');
   var audioStatus = document.getElementById('autoplayAudioStatus');
   var audioUnlock = document.getElementById('audioUnlock');
+  var canvasKicker = document.getElementById('motionCanvasKicker');
+  var canvasClock = document.getElementById('motionCanvasClock');
+  var motionCanvas = document.querySelector('.qq-motion-canvas');
 
   var playback = {
     running: false,
@@ -97,6 +100,34 @@ function runtimeScript(): string {
 
   function clampTime(ms) { return Math.max(0, Math.min(ms, durationMs)); }
   function stepsOf(b) { return Math.max(1, Number(b.getAttribute('data-steps') || 1)); }
+
+  function updateCanvasChrome(item, ms) {
+    if (!item || !item.beat) return;
+    if (motionCanvas) {
+      motionCanvas.style.setProperty('--motion-accent', item.beat.getAttribute('data-accent') || '#e85d36');
+      motionCanvas.style.setProperty('--motion-accent-2', item.beat.getAttribute('data-accent-2') || '#fbbf24');
+    }
+    if (canvasKicker) canvasKicker.textContent = item.beat.getAttribute('data-eyebrow') || 'MOTION';
+    if (canvasClock) canvasClock.textContent = fmtClock(ms) + ' / ' + fmtClock(durationMs);
+  }
+
+  function updateGraphicProgress(beat, step) {
+    if (!beat) return;
+    Array.prototype.forEach.call(beat.querySelectorAll('[data-step-index]'), function (el) {
+      var index = Number(el.getAttribute('data-step-index')) || 0;
+      var visible = index < step;
+      el.classList.toggle('is-visible', visible);
+      el.style.display = visible ? '' : 'none';
+    });
+    var number = beat.querySelector('[data-step-number]');
+    if (number) number.textContent = String(Math.min(step, stepsOf(beat))).padStart(2, '0');
+    var splitAfter = beat.querySelector('[data-split-after]');
+    if (splitAfter) {
+      splitAfter.textContent = step > 1
+        ? (splitAfter.getAttribute('data-split-after') || beat.getAttribute('data-scene-title') || '')
+        : (beat.getAttribute('data-scene-title') || '');
+    }
+  }
 
   function fmtClock(ms) {
     var total = Math.max(0, Math.floor(ms / 1000));
@@ -243,6 +274,7 @@ function runtimeScript(): string {
         el.classList.toggle('on', i < target);
         el.classList.toggle('settled', i < target);
       });
+      updateGraphicProgress(beat, target);
     }
     state.beat = beats.indexOf(beat);
     state.step = target;
@@ -263,6 +295,7 @@ function runtimeScript(): string {
       el.classList.toggle('settled', i < step - 1);
     });
     state.step = step;
+    updateGraphicProgress(beat, step);
     document.body.classList.add('animating');
   }
 
@@ -302,6 +335,7 @@ function runtimeScript(): string {
       pauseAudio(false);
       document.body.classList.remove('autoplay-running');
     }
+    updateCanvasChrome(item, t);
     updateHudTime(t);
   }
 
@@ -539,38 +573,19 @@ function beatHtml(input: {
   index: number;
 }): string {
   const sceneTitle = input.scene?.title || input.title;
-  const steps = input.kind === 'broll'
+  const bullets = input.kind === 'broll'
     ? []
     : uniqueMotionLabels(
       input.scene?.bullets?.length ? input.scene.bullets : input.stepLabels,
       sceneTitle,
     );
-  const stepNodes = steps
-    .map((label, i) => {
-      const isLast = i === steps.length - 1;
-      return (
-        `<div class="step${isLast ? ' step-lock' : ''}" data-step-label="${esc(label)}">` +
-        `<span class="step-marker">${String(i + 1).padStart(2, '0')}</span>` +
-        `<span class="step-text">${esc(label)}</span>` +
-        `</div>`
-      );
-    })
-    .join('');
   const isClosing = input.kind === 'closing';
   const isBroll = input.kind === 'broll';
   const variant = deriveVariant(input.scene, input.kind, input.index);
   const motion = deriveMotion(input.scene, variant, input.index);
-  const visual = input.scene?.visual || (isClosing ? 'quote-lock' : steps.length > 1 ? 'path-build' : 'claim-lockup');
-  const primitive = input.scene?.primitive || (steps.length > 1 ? 'Path' : 'Claim');
-  const layoutSkeleton = input.scene?.layout === 'closing'
-    ? 'L02'
-    : input.scene?.layout === 'split'
-      ? 'L03'
-      : input.scene?.layout === 'steps'
-        ? 'L04'
-        : input.scene?.layout === 'quote'
-          ? 'L02'
-          : 'L01';
+  const layout = input.scene?.layout || (isClosing ? 'closing' : isBroll ? 'quote' : input.index === 0 ? 'hero' : 'split');
+  const visual = input.scene?.visual || (isClosing ? 'quote-lock' : bullets.length > 1 ? 'path-build' : 'claim-lockup');
+  const primitive = input.scene?.primitive || (bullets.length > 1 ? 'Path' : 'Claim');
   const kicker = input.scene?.eyebrow || (isBroll
     ? 'B-ROLL'
     : isClosing
@@ -585,34 +600,29 @@ function beatHtml(input: {
     isClosing ? 'beat-closing' : '',
     isBroll ? 'beat-broll' : '',
   ].filter(Boolean).join(' ');
-  const brollIndex = isBroll
-    ? `<div class="broll-index">${String(parseInt(input.id.replace(/\D+/gu, ''), 10) || 1).padStart(2, '0')}</div>`
-    : '';
-  const visualHtml = visual === 'number-count'
-    ? `<div class="scene-number"><strong>${String(steps.length || 1).padStart(2, '0')}</strong><span>KEY POINTS</span></div>`
+  const graphic = visual === 'number-count'
+    ? `<div class="qq-motion-live-number"><strong data-step-number>${String(Math.max(1, bullets.length ? 1 : 1)).padStart(2, '0')}</strong><span>KEY POINTS</span></div>`
     : visual === 'quote-lock'
-      ? `<blockquote class="scene-quote">${esc(input.scene?.body || sceneTitle)}</blockquote>`
+      ? `<blockquote class="qq-motion-live-quote">${esc(input.scene?.body || sceneTitle)}</blockquote>`
       : visual === 'split-compare'
-        ? `<div class="scene-split"><div><small>BEFORE</small><strong>${esc(steps[0] || '原来的做法')}</strong></div><i></i><div class="is-focus"><small>AFTER</small><strong>${esc(steps[1] || sceneTitle)}</strong></div></div>`
+        ? `<div class="qq-motion-live-split"><div><small>BEFORE</small><strong>${esc(bullets[0] || '原来的做法')}</strong></div><i></i><div class="is-focus"><small>AFTER</small><strong data-split-after="${esc(bullets[1] || sceneTitle)}">${esc(sceneTitle)}</strong></div></div>`
         : visual === 'system-layer-expand'
-          ? `<div class="scene-layers">${steps.slice(0, 3).map((label, i) => `<div class="layer"><span>${String(i + 1).padStart(2, '0')}</span><strong>${esc(label)}</strong></div>`).join('')}</div>`
-          : `<div class="scene-lockup"><i></i><span>${esc(primitive)}</span></div>`;
+          ? `<div class="qq-motion-live-layers">${bullets.slice(0, 3).map((label, i) => `<div data-step-index="${i}"><span>${String(i + 1).padStart(2, '0')}</span><strong>${esc(label)}</strong></div>`).join('')}</div>`
+          : visual === 'path-build'
+            ? `<div class="qq-motion-live-path">${bullets.map((label, i) => `<div class="qq-motion-live-path-item" data-step-index="${i}"><span>${String(i + 1).padStart(2, '0')}</span><strong>${esc(label)}</strong>${i < bullets.length - 1 ? '<i aria-hidden="true"></i>' : ''}</div>`).join('')}</div>`
+            : `<div class="qq-motion-live-lockup"><i aria-hidden="true"></i><span>${esc(primitive)}</span></div>`;
   return (
     `<section class="${beatClass}" id="${esc(input.id)}" ` +
-    `data-kind="${esc(input.kind)}" data-steps="${steps.length}" ` +
-    `data-layout="${layoutSkeleton}" data-primitive="${esc(primitive)}" data-visual-demo="${esc(visual)}" ` +
+    `data-kind="${esc(input.kind)}" data-steps="${bullets.length}" data-eyebrow="${esc(kicker)}" ` +
+    `data-scene-title="${esc(sceneTitle)}" data-primitive="${esc(primitive)}" data-visual-demo="${esc(visual)}" ` +
+    `data-accent="${sceneAccent}" data-accent-2="${sceneAccent2}" ` +
     `data-variant="${variant}" data-motion="${motion}" data-start-ms="${input.startMs}" data-end-ms="${input.endMs}" ` +
     `style="--scene-accent:${sceneAccent};--scene-accent-2:${sceneAccent2};--scene-order:${input.index}" data-step-times="${input.stepTimes.join(',')}">` +
-    `<div class="scene-backdrop" aria-hidden="true"><i class="backdrop-glow"></i><i class="backdrop-line"></i><i class="backdrop-grid"></i></div>` +
-    `<div class="scene">` +
-    `${brollIndex}` +
-    `<div class="scene-meta"><div class="beat-kicker">${esc(kicker)}</div><span class="scene-counter">${String(input.index + 1).padStart(2, '0')} / ${esc(input.kind.toUpperCase())}</span></div>` +
-    `<div class="scene-copy"><h2 class="beat-title" data-safe-box="title">${esc(sceneTitle)}</h2>` +
-    (input.scene?.body ? `<p class="beat-body">${esc(input.scene.body)}</p>` : '') +
-    `<div class="scene-visual">${visualHtml}</div></div>` +
-    `<div class="beat-steps visual-${esc(visual)}">${stepNodes}</div>` +
-    `<div class="scene-footer"><span>${esc(primitive)} / ${esc(variant)}</span><span>${esc(input.stepTimes.length ? 'SRT REVEAL' : 'LOCK FRAME')}</span></div>` +
-    `</div></section>`
+    `<div class="qq-motion-scene is-${esc(layout)} is-${esc(visual)} is-variant-${variant} is-motion-${motion}">` +
+    `<div class="qq-motion-scene-index">${String(input.index + 1).padStart(2, '0')}</div>` +
+    `<div class="qq-motion-scene-copy"><h4>${esc(sceneTitle)}</h4>` +
+    (input.scene?.body ? `<p>${esc(input.scene.body)}</p>` : '') +
+    `${graphic}</div></div></section>`
   );
 }
 
@@ -797,10 +807,64 @@ body.motion-intensity-explosive .beat-title{font-weight:820;letter-spacing:-.075
 `;
 }
 
+/** 独立页复用播放器 Motion v2 的视觉层，避免两个入口各自演化。 */
+function playerMotionCss(): string {
+  return String.raw`
+.qq-motion-canvas{position:absolute;inset:0;overflow:hidden;padding:0;--motion-ink:#f5f5f7;--motion-muted:rgba(245,245,247,.58);--motion-rule:rgba(255,255,255,.16);--motion-paper:#090a0c;--motion-accent:#e85d36;--motion-accent-2:#fbbf24;color:#f6f7fb;background:radial-gradient(circle at 72% 48%,color-mix(in srgb,var(--motion-accent) 26%,transparent),transparent 32%),linear-gradient(135deg,#101320,#080910 72%);isolation:isolate}
+.qq-motion-canvas::before{content:"";position:absolute;z-index:0;inset:-30%;pointer-events:none;background:linear-gradient(122deg,transparent 0 48%,color-mix(in srgb,var(--motion-accent) 15%,transparent) 48.2% 49%,transparent 49.2%),radial-gradient(ellipse at 12% 78%,color-mix(in srgb,var(--motion-accent-2) 13%,transparent),transparent 32%);transform:rotate(-4deg)}
+.qq-motion-canvas::after{content:"";position:absolute;left:6%;right:6%;bottom:8%;height:1px;background:linear-gradient(90deg,var(--motion-accent),transparent);opacity:.65}
+.qq-motion-canvas.motion-style-editorial-magazine{--motion-ink:#171717;--motion-muted:#67635c;--motion-rule:rgba(23,23,23,.18);--motion-paper:#f2eee7;--motion-accent:#b91c1c;color:var(--motion-ink);background:var(--motion-paper)}
+.qq-motion-canvas.motion-style-editorial-magazine::before,.qq-motion-canvas.motion-style-newspaper-evidence::before{background:repeating-linear-gradient(90deg,transparent 0 13%,rgba(23,23,23,.035) 13.05% 13.1%)}
+.qq-motion-canvas.motion-style-sketch-note{--motion-ink:#25231f;--motion-muted:#777067;--motion-rule:rgba(37,35,31,.26);--motion-paper:#f5f1e8;--motion-accent:#d92d20;color:var(--motion-ink);background-color:var(--motion-paper);background-image:linear-gradient(rgba(71,115,143,.09) 1px,transparent 1px),linear-gradient(90deg,rgba(71,115,143,.09) 1px,transparent 1px);background-size:24px 24px}
+.qq-motion-canvas.motion-style-finance-studio-cards{--motion-ink:#ecfeff;--motion-muted:rgba(236,254,255,.56);--motion-rule:rgba(45,212,191,.24);--motion-paper:#071415;--motion-accent:#2dd4bf;background:linear-gradient(135deg,#091b1e,#061012 76%)}
+.qq-motion-canvas.motion-style-newspaper-evidence{--motion-ink:#232323;--motion-muted:#6d685e;--motion-rule:rgba(35,35,35,.22);--motion-paper:#ebe5d8;--motion-accent:#b91c1c;color:var(--motion-ink);background:var(--motion-paper)}
+.qq-motion-canvas.motion-style-paper-collage{--motion-ink:#211d1a;--motion-muted:#6d6259;--motion-rule:rgba(33,29,26,.2);--motion-paper:#f3ead9;--motion-accent:#e85d36;color:var(--motion-ink);background:#f3ead9}
+.qq-motion-canvas.motion-style-paper-collage::before{inset:10% 8% 14% 42%;transform:rotate(3deg);background:#f9f2e6;box-shadow:12px 14px 0 rgba(33,29,26,.1)}
+.qq-motion-canvas-top,.qq-motion-canvas-footer{position:absolute;left:6%;right:6%;z-index:4;display:flex;justify-content:space-between;gap:10px;color:var(--motion-muted,rgba(255,255,255,.55));font:700 11px var(--font-mono,ui-monospace);letter-spacing:.12em;text-transform:uppercase}
+.qq-motion-canvas-top{top:5.5%}.qq-motion-canvas-footer{bottom:5%;border-top:1px solid var(--motion-rule);padding-top:10px}
+.qq-motion-canvas-top span:first-child{color:var(--motion-accent)}
+.qq-motion-canvas-grid{position:absolute;inset:0;z-index:0;opacity:.25;background-image:linear-gradient(color-mix(in srgb,var(--motion-accent) 10%,transparent) 1px,transparent 1px),linear-gradient(90deg,color-mix(in srgb,var(--motion-accent) 10%,transparent) 1px,transparent 1px);background-size:10% 20%;mask-image:linear-gradient(120deg,#000 0%,transparent 78%)}
+.js .qq-motion-canvas .beat{position:absolute;inset:0;display:none;z-index:1}.js .qq-motion-canvas .beat.active{display:block}
+.qq-motion-canvas .qq-motion-scene{position:absolute;z-index:2;inset:19% 7% 16%;display:grid;grid-template-columns:9% minmax(0,1fr);align-items:start;gap:2%}
+.qq-motion-canvas .qq-motion-scene-index{align-self:start;color:var(--motion-accent);font:800 clamp(30px,6.8vw,96px) var(--font-mono,ui-monospace);letter-spacing:0;opacity:.9}
+.qq-motion-canvas .qq-motion-scene-copy{max-width:100%}
+.qq-motion-canvas .qq-motion-scene-copy h4{max-width:980px;margin:0;color:var(--motion-ink);font-size:clamp(22px,5.2vw,78px);line-height:1.02;letter-spacing:-.055em;font-weight:850;word-break:keep-all;text-wrap:balance}
+.qq-motion-canvas .qq-motion-scene-copy p{max-width:680px;margin:4% 0 0;color:var(--motion-muted);font-size:clamp(12px,1.2vw,17px);line-height:1.6}
+.qq-motion-canvas .qq-motion-live-lockup,.qq-motion-canvas .qq-motion-live-quote,.qq-motion-canvas .qq-motion-live-number,.qq-motion-canvas .qq-motion-live-path,.qq-motion-canvas .qq-motion-live-split,.qq-motion-canvas .qq-motion-live-layers{margin-top:6%}
+.qq-motion-canvas .qq-motion-live-lockup{display:flex;align-items:center;gap:10px;color:var(--motion-accent);font:800 10px var(--font-mono,ui-monospace);letter-spacing:.12em}
+.qq-motion-canvas .qq-motion-live-lockup i{display:block;width:54px;height:1px;background:var(--motion-accent)}
+.qq-motion-canvas .qq-motion-live-quote{max-width:860px;margin-left:0;padding-left:16px;border-left:3px solid var(--motion-accent);color:var(--motion-ink);font:650 clamp(16px,2.2vw,31px)/1.35 Georgia,"Songti SC",serif}
+.qq-motion-canvas .qq-motion-live-number{display:flex;align-items:baseline;gap:12px;color:var(--motion-accent)}
+.qq-motion-canvas .qq-motion-live-number strong{font:800 clamp(42px,9vw,130px) var(--font-mono,ui-monospace);letter-spacing:-.05em}.qq-motion-canvas .qq-motion-live-number span{color:var(--motion-muted);font:700 10px var(--font-mono,ui-monospace);letter-spacing:.12em}
+.qq-motion-canvas .qq-motion-live-path{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;max-width:900px}
+.qq-motion-canvas .qq-motion-live-path-item{position:relative;min-width:0;padding:12px 16px 0 0;border-top:2px solid color-mix(in srgb,var(--motion-accent) 72%,transparent)}
+.qq-motion-canvas .qq-motion-live-path-item>span{display:block;margin-bottom:7px;color:var(--motion-accent);font:700 10px var(--font-mono,ui-monospace)}
+.qq-motion-canvas .qq-motion-live-path-item strong{display:block;color:var(--motion-ink);font-size:clamp(10px,1.25vw,16px);line-height:1.3}.qq-motion-canvas .qq-motion-live-path-item>i{position:absolute;top:5px;left:35px;right:12px;height:1px;background:var(--motion-accent);opacity:.65}
+.qq-motion-canvas .qq-motion-live-split{display:grid;grid-template-columns:1fr 24px 1fr;max-width:860px;align-items:stretch;border-top:1px solid var(--motion-rule);border-bottom:1px solid var(--motion-rule)}
+.qq-motion-canvas .qq-motion-live-split>div{display:grid;gap:8px;align-content:center;min-height:68px;padding:12px 16px}.qq-motion-canvas .qq-motion-live-split>div.is-focus{background:color-mix(in srgb,var(--motion-accent) 10%,transparent)}
+.qq-motion-canvas .qq-motion-live-split small{color:var(--motion-muted);font:700 9px var(--font-mono,ui-monospace);letter-spacing:.12em}.qq-motion-canvas .qq-motion-live-split strong{color:var(--motion-ink);font-size:clamp(10px,1.2vw,15px)}.qq-motion-canvas .qq-motion-live-split>i{width:1px;height:70%;align-self:center;background:var(--motion-rule)}
+.qq-motion-canvas .qq-motion-live-layers{display:grid;gap:7px;max-width:820px}.qq-motion-canvas .qq-motion-live-layers div{display:grid;grid-template-columns:28px 1fr;gap:10px;align-items:center;padding:9px 12px;border-left:3px solid var(--motion-accent);border-bottom:1px solid var(--motion-rule);background:color-mix(in srgb,var(--motion-accent) 8%,transparent)}.qq-motion-canvas .qq-motion-live-layers span{color:var(--motion-accent);font:700 9px var(--font-mono,ui-monospace)}.qq-motion-canvas .qq-motion-live-layers strong{color:var(--motion-ink);font-size:clamp(10px,1.2vw,15px)}
+.qq-motion-canvas .qq-motion-scene.is-closing{grid-template-columns:1fr;text-align:center}.qq-motion-canvas .qq-motion-scene.is-closing .qq-motion-scene-index{position:absolute;top:-18%;right:0;opacity:.2}.qq-motion-canvas .qq-motion-scene.is-closing .qq-motion-scene-copy{max-width:1360px;margin:auto}.qq-motion-canvas .qq-motion-scene.is-variant-closing-lock{inset:22% 8% 14%;grid-template-columns:1fr;text-align:center}.qq-motion-canvas .qq-motion-scene.is-variant-closing-lock .qq-motion-scene-index{position:absolute;top:-19%;right:0;opacity:.22}.qq-motion-canvas .qq-motion-scene.is-variant-closing-lock .qq-motion-scene-copy h4{max-width:920px;margin-inline:auto}
+.qq-motion-canvas .qq-motion-scene.is-variant-hook-slam{inset:18% 6% 14%}.qq-motion-canvas .qq-motion-scene.is-variant-hook-slam .qq-motion-scene-copy h4{max-width:1050px;font-size:clamp(28px,6.4vw,94px)}.qq-motion-canvas .qq-motion-scene.is-variant-hook-slam .qq-motion-scene-copy::after{content:"";display:block;width:34%;height:3px;margin-top:7%;background:linear-gradient(90deg,var(--motion-accent),var(--motion-accent-2,#fbbf24),transparent);transform:skewX(-28deg);transform-origin:left}
+.qq-motion-canvas .qq-motion-scene.is-variant-diagonal-reveal{inset:25% 8% 13%;align-items:end}.qq-motion-canvas .qq-motion-scene.is-variant-diagonal-reveal .qq-motion-scene-copy{transform:rotate(-1.4deg)}.qq-motion-canvas .qq-motion-scene.is-variant-diagonal-reveal .qq-motion-scene-copy h4{max-width:860px}
+.qq-motion-canvas .qq-motion-scene.is-variant-signal-bars{inset:19% 6% 13%}.qq-motion-canvas .qq-motion-scene.is-variant-signal-bars .qq-motion-scene-copy h4{max-width:740px}.qq-motion-canvas .qq-motion-scene.is-variant-signal-bars::after{content:"";position:absolute;right:0;bottom:7%;width:42%;height:36%;border-top:1px solid color-mix(in srgb,var(--motion-accent) 56%,transparent);border-right:1px solid color-mix(in srgb,var(--motion-accent) 32%,transparent);transform:skewY(-9deg);opacity:.72}
+.qq-motion-canvas .qq-motion-scene.is-variant-before-after .qq-motion-scene-copy h4{max-width:920px}.qq-motion-canvas .qq-motion-scene.is-variant-stack-cascade{inset:20% 6% 13%}.qq-motion-canvas .qq-motion-scene.is-variant-stack-cascade .qq-motion-scene-copy h4{max-width:820px}.qq-motion-canvas .qq-motion-scene.is-variant-quote-cut{inset:19% 5% 14%}.qq-motion-canvas .qq-motion-scene.is-variant-quote-cut .qq-motion-scene-copy{padding-left:4%}.qq-motion-canvas .qq-motion-scene.is-variant-quote-cut .qq-motion-scene-copy h4{max-width:900px;font-family:Georgia,"Songti SC",serif;font-weight:760;letter-spacing:-.03em}
+.qq-motion-canvas .qq-motion-scene.is-variant-ticker-drive .qq-motion-scene-copy::before{content:"///";display:block;margin-bottom:6%;color:var(--motion-accent);font:800 24px var(--font-mono,ui-monospace);letter-spacing:.24em}.qq-motion-canvas .qq-motion-scene.is-variant-ticker-drive .qq-motion-scene-copy::after{content:"";display:block;width:100%;height:1px;margin-top:7%;background:repeating-linear-gradient(90deg,var(--motion-accent) 0 22px,transparent 22px 34px);animation:qq-motion-ticker-line 1.8s cubic-bezier(.16,1,.3,1) both}
+.qq-motion-canvas .qq-motion-scene.is-motion-slam.active,.qq-motion-canvas .qq-motion-scene.is-motion-wipe.active,.qq-motion-canvas .qq-motion-scene.is-motion-scan.active,.qq-motion-canvas .qq-motion-scene.is-motion-cascade.active,.qq-motion-canvas .qq-motion-scene.is-motion-drift.active,.qq-motion-canvas .qq-motion-scene.is-motion-type-on.active,.qq-motion-canvas .qq-motion-scene.is-motion-pulse.active{animation-fill-mode:both}
+.qq-motion-canvas .beat.active.is-entering .qq-motion-scene{animation:qq-motion-scene-in .72s cubic-bezier(.16,1,.3,1) both}.qq-motion-canvas .beat.motion-slam.active.is-entering .qq-motion-scene{animation-name:qq-motion-slam-in}.qq-motion-canvas .beat.motion-wipe.active.is-entering .qq-motion-scene{animation-name:qq-motion-wipe-in}.qq-motion-canvas .beat.motion-scan.active.is-entering .qq-motion-scene{animation-name:qq-motion-scan-in}.qq-motion-canvas .beat.motion-cascade.active.is-entering .qq-motion-scene{animation-name:qq-motion-cascade-in}.qq-motion-canvas .beat.motion-drift.active.is-entering .qq-motion-scene{animation-name:qq-motion-drift-in}.qq-motion-canvas .beat.motion-type-on.active.is-entering .qq-motion-scene{animation-name:qq-motion-type-in}.qq-motion-canvas .beat.motion-pulse.active.is-entering .qq-motion-scene{animation-name:qq-motion-pulse-in}
+.qq-motion-canvas [data-step-index]{opacity:0;transform:translateY(18px);transition:opacity .44s cubic-bezier(.16,1,.3,1),transform .58s cubic-bezier(.16,1,.3,1)}.qq-motion-canvas [data-step-index].is-visible{opacity:1;transform:none}.qq-motion-canvas.motion-style-editorial-magazine .qq-motion-live-quote,.qq-motion-canvas.motion-style-newspaper-evidence .qq-motion-live-quote{border-left-width:4px}.qq-motion-canvas.motion-style-sketch-note .qq-motion-live-split,.qq-motion-canvas.motion-style-sketch-note .qq-motion-live-layers{border-style:dashed}.qq-motion-canvas.motion-style-paper-collage .qq-motion-live-split>div{box-shadow:4px 5px 0 rgba(33,29,26,.12)}
+body.motion-typography-editorial .qq-motion-scene-copy h4{font-family:Georgia,"Songti SC",serif;font-weight:760;letter-spacing:-.03em}body.motion-typography-mono .qq-motion-scene-copy h4{font-family:var(--font-mono,ui-monospace,SFMono-Regular,monospace);font-weight:760;letter-spacing:-.06em}body.motion-typography-handwritten .qq-motion-scene-copy h4{font-family:"Comic Sans MS","Kaiti SC",cursive;font-weight:700;letter-spacing:-.035em}
+body.motion-density-airy .qq-motion-scene{inset:16% 8% 14%}body.motion-density-airy .qq-motion-scene-copy h4{max-width:1080px;line-height:1.08}body.motion-density-airy .qq-motion-live-lockup,body.motion-density-airy .qq-motion-live-quote,body.motion-density-airy .qq-motion-live-number,body.motion-density-airy .qq-motion-live-path,body.motion-density-airy .qq-motion-live-split,body.motion-density-airy .qq-motion-live-layers{margin-top:8%}body.motion-density-dense .qq-motion-scene{inset:21% 5% 13%}body.motion-density-dense .qq-motion-scene-copy h4{max-width:1160px;font-size:clamp(20px,4.5vw,68px)}body.motion-density-dense .qq-motion-live-lockup,body.motion-density-dense .qq-motion-live-quote,body.motion-density-dense .qq-motion-live-number,body.motion-density-dense .qq-motion-live-path,body.motion-density-dense .qq-motion-live-split,body.motion-density-dense .qq-motion-live-layers{margin-top:4%}body.motion-intensity-calm .qq-motion-scene{animation-duration:1.1s}body.motion-intensity-explosive .qq-motion-scene-copy h4{font-weight:820;letter-spacing:-.075em}body.motion-intensity-explosive .qq-motion-scene-index{transform:scale(1.12);transform-origin:top left}
+@keyframes qq-motion-scene-in{from{opacity:0;transform:translateY(26px)}to{opacity:1;transform:none}}@keyframes qq-motion-slam-in{from{opacity:0;transform:scale(.78) rotate(2deg);filter:blur(8px)}to{opacity:1;transform:none;filter:none}}@keyframes qq-motion-wipe-in{from{opacity:0;clip-path:inset(0 100% 0 0)}to{opacity:1;clip-path:inset(0)}}@keyframes qq-motion-scan-in{from{opacity:0;transform:translateX(72px)}to{opacity:1;transform:none}}@keyframes qq-motion-cascade-in{from{opacity:0;transform:translateY(56px) skewY(3deg)}to{opacity:1;transform:none}}@keyframes qq-motion-drift-in{from{opacity:0;transform:translateX(-66px)}to{opacity:1;transform:none}}@keyframes qq-motion-type-in{from{opacity:0;transform:scaleX(.76);transform-origin:left center}to{opacity:1;transform:none}}@keyframes qq-motion-pulse-in{from{opacity:0;transform:scale(1.12)}to{opacity:1;transform:none}}@keyframes qq-motion-ticker-line{from{transform:translateX(-30%);opacity:0}to{transform:none;opacity:1}}
+@media (max-width:1100px){.qq-motion-canvas .qq-motion-scene-copy h4{font-size:58px}.qq-motion-canvas .qq-motion-live-number strong{font-size:190px}.qq-motion-canvas .qq-motion-live-quote{font-size:38px}.qq-motion-canvas .qq-motion-live-split>div strong{font-size:24px}}
+@media (prefers-reduced-motion:reduce){.qq-motion-canvas *, .qq-motion-canvas *::before, .qq-motion-canvas *::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}.qq-motion-canvas .beat.active.is-entering .qq-motion-scene{opacity:1!important;transform:none!important;filter:none!important;clip-path:none!important}}
+`;
+}
+
 /** 生成单文件 HTML（时间属性由已确认时间轴直接内联） */
 export function renderMotionHtml(timeline: MotionTimeline, jobId: string): string {
   const [c1, c2] = gradientPair(jobId);
-  const pageStyle = timeline.page?.style || 'apple-tech-gradient';
+  const pageStyle = timeline.page?.style || 'editorial-magazine';
   const styleOptions = timeline.page?.styleOptions;
   const typography = styleOptions?.typography || 'auto';
   const density = styleOptions?.density || 'balanced';
@@ -921,11 +985,22 @@ body{overflow:hidden;background:var(--bg);color:var(--text);
 <meta charset="utf-8">
 <meta name="viewport" content="width=1920,initial-scale=1">
 <title>${esc(timeline.title)} · Motion</title>
-<style>${css}${richMotionCss()}${kineticMotionCss()}</style>
+<style>${css}${richMotionCss()}${kineticMotionCss()}${playerMotionCss()}</style>
 </head>
 <body class="js style-${esc(pageStyle)} motion-typography-${esc(typography)} motion-density-${esc(density)} motion-intensity-${esc(intensity)}" data-motion-job="${esc(jobId)}">
 <div id="stage">
+<div class="qq-motion-canvas motion-style-${esc(pageStyle)} motion-typography-${esc(typography)} motion-density-${esc(density)} motion-intensity-${esc(intensity)}" data-motion-renderer="player-v2">
+  <div class="qq-motion-canvas-grid" aria-hidden="true"></div>
+  <div class="qq-motion-canvas-top">
+    <span id="motionCanvasKicker">MOTION</span>
+    <span id="motionCanvasClock">00:00.000 / ${formatMotionClock(durationMs)}</span>
+  </div>
 ${beatsHtml}
+<div class="qq-motion-canvas-footer">
+  <span id="motionCanvasMode">${timeline.page?.source === 'ai' ? 'AI' : 'MOTION'} · ${esc(pageStyle)}</span>
+  <span>${esc(timeline.title)}</span>
+</div>
+</div>
 <div class="hud">
   <div class="hud-dots" id="hudDots">${timeline.beats.map(() => '<span class="hud-dot"></span>').join('')}</div>
   <span id="hudTime">00:00.000 / ${formatMotionClock(durationMs)}</span>

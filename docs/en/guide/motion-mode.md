@@ -44,7 +44,7 @@ Start with “auto + balanced + dynamic”, then change one option at a time and
 | **S3 Chapter timeline** | Map each chapter's opening sentence to a real SRT cue. Chapter windows absorb natural pauses, so page count does not grow with subtitle fragmentation |
 | **S3.5 P3.5 gate** | Check that the first chapter starts at 0ms, chapters do not overlap, the closing chapter reaches the master duration, step ms values are valid, and the final beat is `closing` |
 | **S4 AI page** | AI chooses an independent composition and entrance motion for every script-driven interval; structured options constrain the base, palette, type, density, and motion intensity |
-| **S5 Preview / export** | The React player switches between all generated pages in real time; a standalone `motion.html` opens with the job audio for full-screen recording, while the HTML download remains an offline visual artifact |
+| **S5 Preview / export** | The React player switches between all generated pages in real time; a standalone `motion.html` opens with the job audio and reuses the player's main visual, composition, and entrance-motion language for full-screen recording, while the HTML download remains an offline visual artifact |
 
 ## Generate from the player
 
@@ -67,10 +67,10 @@ The timeline is locked in `motion-timeline.json`; regenerating the AI page does 
 
 - **Master clock**: `performance.now()` + `requestAnimationFrame`, no setTimeout chains; catches up by absolute time after a background tab
 - **Gate overlay**: ready → 3-2-1 countdown (leave room before recording)
-- **Audio**: the standalone page first tries to autoplay the job audio; when the browser blocks it, the visual preview still runs and a bottom button enables sound after a user click; pause, seek, and replay re-align the audio
+- **Audio**: the standalone page first tries to autoplay the job audio; when the browser blocks it, the visual preview still runs and a bottom button enables sound after a user click; pause, seek, and replay re-align the audio. Older jobs are upgraded to the latest player visual layer on first open without regenerating the script
 - **HUD**: beat dots + current millisecond clock
 - **Keyboard**: `Space` pause/resume · `←` `→` ±5s · `R` restart · `F` fullscreen
-- **Style**: the color base can use product-launch black space, editorial magazine, sketch note, finance studio, evidence newspaper, or paper collage; generation can also constrain palette, type, information density, and motion intensity; each beat adds its own composition and entrance motion with pure CSS animation and class toggles, zero external dependencies
+- **Style**: the color base can use product-launch black space, editorial magazine, sketch note, finance studio, evidence newspaper, or paper collage; generation can also constrain palette, type, information density, and motion intensity; the player and standalone `motion.html` use the same Motion visual structure, while each beat adds its own composition and entrance motion with pure CSS animation and class toggles, zero external dependencies
 
 ## API
 
