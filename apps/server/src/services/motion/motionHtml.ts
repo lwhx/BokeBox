@@ -82,6 +82,8 @@ function runtimeScript(): string {
   var countdownEl = document.getElementById('autoplayCount');
   var hudTime = document.getElementById('hudTime');
   var hudDots = document.getElementById('hudDots');
+  var audioStatus = document.getElementById('autoplayAudioStatus');
+  var audioUnlock = document.getElementById('audioUnlock');
 
   var playback = {
     running: false,
@@ -152,12 +154,38 @@ function runtimeScript(): string {
     return Boolean(audio.getAttribute('src'));
   }
 
+  function showAudioStatus(message) {
+    if (!audioStatus) return;
+    audioStatus.textContent = message;
+    audioStatus.hidden = false;
+  }
+
+  function clearAudioStatus() {
+    if (audioStatus) audioStatus.hidden = true;
+  }
+
+  function setAudioUnlockVisible(visible) {
+    if (audioUnlock) audioUnlock.hidden = !visible;
+  }
+
   function primeAudio() {
     if (!ensureAudioSource()) return;
-    audio.muted = true;
+    audio.muted = false;
     seekAudio(0);
     var promise = audio.play();
-    if (promise && promise.catch) promise.catch(function () {});
+    if (promise && promise.then) {
+      promise.then(function () {
+        clearAudioStatus();
+        setAudioUnlockVisible(false);
+        /* 先在用户手势内取得播放权限，倒计时期间不消耗正片音频。 */
+        if (!playback.running) {
+          audio.pause();
+          seekAudio(0);
+        }
+      }).catch(function () {
+        showAudioStatus('点击“播放并启用声音”后，浏览器才会输出音频');
+      });
+    }
   }
 
   function startAudio(ms) {
@@ -165,7 +193,15 @@ function runtimeScript(): string {
     audio.muted = false;
     seekAudio(ms);
     var promise = audio.play();
-    if (promise && promise.catch) promise.catch(function () {});
+    if (promise && promise.then) {
+      promise.then(function () {
+        clearAudioStatus();
+        setAudioUnlockVisible(false);
+      }).catch(function () {
+        showAudioStatus('音频播放被浏览器拦截，请再次点击播放按钮');
+        setAudioUnlockVisible(true);
+      });
+    }
   }
 
   function pauseAudio(reset) {
@@ -173,6 +209,26 @@ function runtimeScript(): string {
     audio.pause();
     audio.muted = false;
     if (reset) seekAudio(0);
+  }
+
+  function tryAutoplay() {
+    if (!AUTO_ENABLED || !ensureAudioSource()) return;
+    audio.muted = false;
+    seekAudio(0);
+    var promise = audio.play();
+    if (promise && promise.then) {
+      promise.then(function () {
+        clearAudioStatus();
+        startAutoplayClock();
+      }).catch(function () {
+        /* 浏览器阻止有声自动播放时，先让画面自动预览。 */
+        startAutoplayClock();
+        if (audioUnlock) audioUnlock.textContent = '点击启用声音';
+        setAudioUnlockVisible(true);
+      });
+    } else {
+      startAutoplayClock();
+    }
   }
 
   /* 静止帧：先落最终态，再决定是否播动画 */
@@ -348,6 +404,19 @@ function runtimeScript(): string {
       startCountdown();
     });
   }
+  if (audio) {
+    audio.addEventListener('error', function () {
+      showAudioStatus('当前任务没有可播放的播客音频');
+      if (audioUnlock) audioUnlock.textContent = '音频不可用';
+      setAudioUnlockVisible(true);
+    });
+  }
+  if (audioUnlock) {
+    audioUnlock.addEventListener('click', function () {
+      if (!playback.running) startAutoplayClock();
+      else startAudio(currentAutoplayTime());
+    });
+  }
 
   document.addEventListener('keydown', function (e) {
     if (e.code === 'Space') { e.preventDefault(); toggleAutoplay(); }
@@ -376,6 +445,8 @@ function runtimeScript(): string {
     if (AUTO_ENABLED) {
       renderAt(0, false);
       scaleStage();
+      ensureAudioSource();
+      tryAutoplay();
     }
   }
 })();
@@ -801,6 +872,8 @@ body{overflow:hidden;background:var(--bg);color:var(--text);
 .hud-dot{width:10px;height:10px;border-radius:50%;background:rgba(255,255,255,.18)}
 .hud-dot.cur{background:linear-gradient(120deg,var(--c1),var(--c2))}
 .autoplay-running .hud{opacity:0;transition:opacity .4s}
+.audio-unlock{position:absolute;left:50%;bottom:74px;z-index:110;transform:translateX(-50%);padding:14px 26px;border:1px solid rgba(255,255,255,.24);border-radius:999px;background:rgba(8,10,18,.82);color:#fff;font-size:20px;font-weight:700;cursor:pointer;box-shadow:0 12px 40px rgba(0,0,0,.28);backdrop-filter:blur(14px)}
+.audio-unlock[hidden]{display:none}
 /* 准备层 */
 .autoplay-gate{position:absolute;inset:0;z-index:120;display:grid;place-items:center;
   background:radial-gradient(900px 600px at 50% 30%,rgba(99,102,241,.14),transparent 65%),var(--bg)}
@@ -814,6 +887,8 @@ body{overflow:hidden;background:var(--bg);color:var(--text);
   background:linear-gradient(120deg,var(--c1),var(--c2));color:#fff;
   font-size:28px;font-weight:600;cursor:pointer}
 .autoplay-controls{font-size:22px;line-height:1.6;color:var(--mute)}
+.autoplay-audio-status{max-width:900px;color:#fca5a5;font-size:20px;line-height:1.45}
+.autoplay-audio-status[hidden]{display:none}
 .autoplay-count{font-size:220px;font-weight:700;line-height:1;
   background:linear-gradient(120deg,var(--c1),var(--c2));
   -webkit-background-clip:text;background-clip:text;color:transparent}
@@ -835,14 +910,16 @@ ${beatsHtml}
   <div class="hud-dots" id="hudDots">${timeline.beats.map(() => '<span class="hud-dot"></span>').join('')}</div>
   <span id="hudTime">00:00.000 / ${formatMotionClock(durationMs)}</span>
 </div>
+<button class="audio-unlock" id="audioUnlock" hidden>点击启用声音</button>
 </div>
 <audio id="motionAudio" preload="auto" aria-hidden="true"></audio>
 <div class="autoplay-gate" id="autoplayGate">
   <div class="autoplay-panel">
     <div class="autoplay-kicker">MOTION · ${esc(timeline.title)}</div>
     <h1 class="autoplay-title">${esc(timeline.title)}</h1>
-    <button class="autoplay-start" id="autoplayStart">准备播放</button>
+    <button class="autoplay-start" id="autoplayStart">播放并启用声音</button>
     <div class="autoplay-controls">空格 暂停/继续 · ←/→ 跳 5 秒 · R 重播 · F 全屏</div>
+    <div class="autoplay-audio-status" id="autoplayAudioStatus" hidden></div>
     <div class="autoplay-count" id="autoplayCount" hidden>3</div>
   </div>
 </div>

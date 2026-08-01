@@ -55,7 +55,7 @@ The timeline is locked in `motion-timeline.json`; regenerating the AI page does 
 
 - **Master clock**: `performance.now()` + `requestAnimationFrame`, no setTimeout chains; catches up by absolute time after a background tab
 - **Gate overlay**: ready → 3-2-1 countdown (leave room before recording)
-- **Audio**: the standalone page loads the current job audio, starts it with the recording gate, and re-aligns it on pause, seek, and replay
+- **Audio**: the standalone page first tries to autoplay the job audio; when the browser blocks it, the visual preview still runs and a bottom button enables sound after a user click; pause, seek, and replay re-align the audio
 - **HUD**: beat dots + current millisecond clock
 - **Keyboard**: `Space` pause/resume · `←` `→` ±5s · `R` restart · `F` fullscreen
 - **Style**: the color base can use product-launch black space, editorial magazine, sketch note, finance studio, evidence newspaper, or paper collage; each beat adds its own composition and entrance motion with pure CSS animation and class toggles, zero external dependencies
