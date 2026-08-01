@@ -1,6 +1,6 @@
 import { writeText } from '../../utils/fs.js';
 import { jobPaths } from '../../utils/paths.js';
-import type { PodcastContent, ScriptPromptOptions } from '../../types/job.js';
+import type { MotionChapter, PodcastContent, ScriptPromptOptions } from '../../types/job.js';
 import { aiFetch, getChatModel, hasApiKey } from '../../utils/aiConfig.js';
 import {
   buildScriptPromptSection,
@@ -41,6 +41,72 @@ function pickGradient(seed: string): string {
   let h = 0;
   for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
   return GRADIENTS[h % GRADIENTS.length];
+}
+
+function chapterTextParts(script: string): string[] {
+  const paragraphs = String(script || '')
+    .split(/\n{2,}/u)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  if (paragraphs.length >= 2) return paragraphs;
+
+  const lines = String(script || '')
+    .split(/\n/u)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (lines.length >= 2) return lines;
+
+  const sentences = String(script || '')
+    .split(/(?<=[。！？!?\.])\s*/u)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  return sentences.length ? sentences : [String(script || '').trim()].filter(Boolean);
+}
+
+function fallbackMotionChapters(
+  script: string,
+  outline: Array<{ title: string; summary: string }>,
+): MotionChapter[] {
+  const parts = chapterTextParts(script);
+  if (parts.length < 2) {
+    return [{
+      id: 'chapter-1',
+      title: outline[0]?.title || '本期重点',
+      summary: outline[0]?.summary || '围绕本期主题提炼核心信息。',
+      script: script.trim(),
+    }];
+  }
+  const count = Math.min(3, Math.max(2, parts.length >= 3 ? 3 : 2));
+  const size = Math.ceil(parts.length / count);
+  return Array.from({ length: count }, (_, index) => {
+    const chunk = parts.slice(index * size, (index + 1) * size).join('\n');
+    const source = outline[index] || outline[outline.length - 1];
+    return {
+      id: `chapter-${index + 1}`,
+      title: source?.title || ['开场钩子', '核心观点', '收束行动'][index] || `第 ${index + 1} 章`,
+      summary: source?.summary || '从口播稿中提炼的一段核心信息。',
+      script: chunk,
+    };
+  }).filter((chapter) => chapter.script.trim());
+}
+
+function normalizeMotionChapters(
+  raw: unknown,
+  script: string,
+  outline: Array<{ title: string; summary: string }>,
+): MotionChapter[] {
+  const candidates = Array.isArray(raw)
+    ? raw.map((item, index) => {
+        const row = item && typeof item === 'object' ? item as Record<string, unknown> : {};
+        return {
+          id: String(row.id || `chapter-${index + 1}`).trim().slice(0, 48),
+          title: String(row.title || '').trim().slice(0, 80),
+          summary: String(row.summary || '').trim().slice(0, 180),
+          script: String(row.script || '').trim(),
+        } satisfies MotionChapter;
+      }).filter((chapter) => chapter.title && chapter.script).slice(0, 3)
+    : [];
+  return candidates.length >= 2 ? candidates : fallbackMotionChapters(script, outline);
 }
 
 /**
@@ -140,6 +206,41 @@ function demoPodcast(
       tags,
       hostIntro: buildDemoHostIntro(scriptPrompt, locale),
       outline,
+      motionChapters: [
+        {
+          id: 'hook',
+          title: 'The one-line shift',
+          summary: 'Reframe the source as a finishable listening experience.',
+          script: [
+            '(磁性 沉稳)Hello, welcome to this episode.',
+            `Today we focus on "${base}" and compress the source into a more finishable highlight version.`,
+            '（深呼吸）Bottom line first: a good podcast is not a verbatim read of the source. Rebuild the rhythm—hook early, keep only high-value points, end with action.',
+          ].join('\n'),
+        },
+        {
+          id: 'core',
+          title: 'The useful middle',
+          summary: 'Keep the memorable ideas and explain why audio changes the format.',
+          script: [
+            'Part one, positioning.',
+            'Video is great for demos; audio is great for companionship and depth. Turning the source into a podcast covers driving, walking, and chores.',
+            'Part two, key takeaways.',
+            ...highlights.map((h) => `- ${h}`),
+          ].join('\n'),
+        },
+        {
+          id: 'close',
+          title: 'Make it repeatable',
+          summary: 'Turn the format into a small repeatable production habit.',
+          script: [
+            '（语速加快）Part three, do this next.',
+            '1. Pull three quote-level insights from your latest source.',
+            '2. Write an 8-12 minute spoken script instead of a full dump.',
+            '3. Use a fixed open/close for show identity.',
+            '（轻笑）That’s it for today. If this helped, share it with someone also repurposing content. See you next time.',
+          ].join('\n'),
+        },
+      ],
       script,
       showNotes,
       estimatedMinutes: 10,
@@ -201,6 +302,41 @@ function demoPodcast(
     tags,
     hostIntro: buildDemoHostIntro(scriptPrompt, locale),
     outline,
+    motionChapters: [
+      {
+        id: 'hook',
+        title: '先说一个关键转变',
+        summary: '把视频内容重构成更容易听完的播客。',
+        script: [
+          '(磁性 沉稳)大家好，欢迎收听本期播客。',
+          `今天我们围绕「${base}」展开，把原本的视频内容压缩成一集更容易听完的精华版。`,
+          '（深呼吸）先说结论：好的播客不是把视频原样读一遍，而是重新组织节奏——开场抓住注意力，中间只保留高价值观点，结尾留下行动感。',
+        ].join('\n'),
+      },
+      {
+        id: 'core',
+        title: '保留真正有用的部分',
+        summary: '解释视频与音频的差异，并集中呈现关键信息。',
+        script: [
+          '第一部分，内容定位。',
+          '视频擅长画面与演示，播客擅长陪伴与深度。把视频转成播客，能覆盖开车、散步、做家务这些场景。',
+          '第二部分，今天的关键信息。',
+          ...highlights.map((h) => `- ${h}`),
+        ].join('\n'),
+      },
+      {
+        id: 'close',
+        title: '把方法变成习惯',
+        summary: '用一个轻量流程持续复用内容。',
+        script: [
+          '（语速加快）第三部分，你可以立刻做的事。',
+          '1. 从最近一条视频里抽出三个“金句级”观点。',
+          '2. 写成 8 到 12 分钟口播稿，而不是完整搬运。',
+          '3. 用固定开场和收尾建立节目辨识度。',
+          '（轻笑）好，今天的内容就到这里。如果你觉得有帮助，欢迎分享给同样在做内容复用的朋友。我们下期见。',
+        ].join('\n'),
+      },
+    ],
     script,
     showNotes,
     estimatedMinutes: 10,
@@ -276,6 +412,7 @@ async function llmPodcast(
 
   let script = String(parsed.script || '').trim();
   if (!script) throw new Error('播客脚本 script 为空');
+  let scriptWasRewritten = false;
 
   // 超字数时重写一次（仍超则保留，但会按实测字数修正时长估算）
   let spokenCount = countSpokenChars(script);
@@ -290,6 +427,7 @@ async function llmPodcast(
     if (rewritten) {
       script = rewritten;
       spokenCount = countSpokenChars(script);
+      scriptWasRewritten = true;
     }
   }
 
@@ -301,6 +439,11 @@ async function llmPodcast(
     Number(parsed.estimatedMinutes) > 0
       ? Math.min(Number(parsed.estimatedMinutes), Math.max(estimatedFromChars, 1))
       : estimatedFromChars;
+  const motionChapters = normalizeMotionChapters(
+    scriptWasRewritten ? undefined : parsed.motionChapters,
+    script,
+    outline,
+  );
 
   return {
     title,
@@ -310,6 +453,7 @@ async function llmPodcast(
     outline: outline.length
       ? outline
       : [{ title: fallback.outlineTitle, summary: fallback.outlineSummary }],
+    motionChapters,
     script,
     showNotes:
       String(parsed.showNotes || '').trim() ||

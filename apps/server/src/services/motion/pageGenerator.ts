@@ -203,6 +203,7 @@ export async function generateMotionPage(
     .join('\n');
   const beatBrief = beats.map((beat, index) => ({
     beatId: beat.id,
+    chapterId: beat.chapterId,
     index,
     kind: beat.kind,
     title: beat.title,
@@ -211,10 +212,10 @@ export async function generateMotionPage(
   const system = [
     '你是资深信息设计师，为播客口播稿生成可直接在线预览的 16:9 Motion 页面内容。',
     '只输出严格 JSON，不要 markdown，不要解释。',
-    '必须返回 {"scenes":[...]}，且每个 beatId 都只能对应一个 scene。',
+    '必须返回 {"scenes":[...]}，且每个 beatId 都只能对应一个 scene；全片 scene 数量必须与 2-3 个章节 beat 完全一致。',
     '不要改变 beatId、时间、顺序；不要编造口播稿以外的事实。',
     '先为整集选择一个 style：apple-tech-gradient、editorial-magazine、sketch-note、finance-studio-cards、newspaper-evidence、paper-collage。全片只能使用一个风格。',
-    '拒绝 dashboard、中心大圆、胶囊节点环绕、三张等宽卡片和随机散点；每页只保留一个第一眼主视觉。',
+    '一章只对应一张主视觉页；拒绝 dashboard、中心大圆、胶囊节点环绕、三张等宽卡片和随机散点；每页只保留一个第一眼主视觉。',
     '每个 scene 必须包含 primitive（Claim/Contrast/Path/System/Evidence）和 visual（claim-lockup/split-compare/path-build/system-layer-expand/number-count/quote-lock）。',
     '页面要像真正的信息动画，不要像表格或 PPT：留白、强层级、一个主视觉、短标题优先。',
     'layout 只能是 hero、split、steps、quote、closing；bullets 最多 4 条；每条短于 24 个汉字。',

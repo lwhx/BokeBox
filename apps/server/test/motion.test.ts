@@ -217,7 +217,7 @@ describe('motion P3.5 timeline gate', () => {
   });
 
   it('accepts narration-pace gaps within 1500ms', () => {
-    const beats = [beat('b1', 0, 10000), beat('b2', 10400, 24000)];
+    const beats = [beat('b1', 0, 10000), { ...beat('b2', 10400, 24000), kind: 'closing' as const }];
     const gate = validateTimeline(beats, 24000);
     assert.equal(gate.pass, true);
     assert.equal(gate.gapMs, 400);
@@ -242,6 +242,12 @@ describe('motion P3.5 timeline gate', () => {
     const gate = validateTimeline(beats, 24000);
     assert.equal(gate.pass, false);
     assert.ok(gate.violations.some((v) => v.code === 'closing-not-at-end'));
+  });
+
+  it('requires the final beat to be a closing beat', () => {
+    const gate = validateTimeline([beat('b1', 0, 24000)], 24000);
+    assert.equal(gate.pass, false);
+    assert.ok(gate.violations.some((v) => v.code === 'closing-kind'));
   });
 
   it('builds coverage rows with step anchors', () => {
@@ -295,5 +301,34 @@ describe('motion AI page layer', () => {
     assert.match(html, /根据口播稿生成的补充说明/);
     assert.match(html, /第一条视觉要点/);
     assert.equal(validateMotionHtml(html, timeline).ok, true);
+  });
+
+  it('escapes generated kicker text in the standalone HTML export', () => {
+    const timeline = {
+      version: 1 as const,
+      jobId: 'job-motion-escape',
+      title: '页面测试',
+      durationMs: 12000,
+      source: 'srt' as const,
+      srtCueCount: 1,
+      optimizedCueCount: 1,
+      beats: [{
+        id: 'b1', kind: 'closing' as const, title: '标题', startMs: 0, endMs: 12000,
+        stepTimes: [], cueRange: [1, 1] as [number, number],
+      }],
+      page: {
+        version: 1 as const,
+        source: 'ai' as const,
+        generatedAt: new Date().toISOString(),
+        scenes: [{
+          beatId: 'b1', layout: 'closing' as const, primitive: 'Claim' as const,
+          visual: 'quote-lock' as const, eyebrow: '<img src=x onerror=alert(1)>',
+          title: '安全标题', body: '安全正文', bullets: [], accent: '#8b5cf6',
+        }],
+      },
+    };
+    const html = renderMotionHtml(timeline, 'job-motion-escape');
+    assert.equal(html.includes('<img src=x onerror=alert(1)>'), false);
+    assert.match(html, /&lt;img src=x onerror=alert\(1\)&gt;/);
   });
 });

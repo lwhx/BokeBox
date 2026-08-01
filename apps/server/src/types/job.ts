@@ -5,6 +5,7 @@ export type {
   TtsMode,
   PresetVoiceId,
   PodcastSegment,
+  MotionChapter,
   ScriptLineTiming,
   ScriptTimingSource,
   Flashcard,

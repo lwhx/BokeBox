@@ -42,7 +42,7 @@ Aligned with Settings, job detail, and the listening library.
 
 
 - Player: progress memory, speed, sleep timer (incl. “end of episode”)  
-- **Motion mode**: generate an AI-driven 16:9 page from the spoken script, preview it in the player, and sync it to the SRT master clock (see [Motion mode](motion-mode.md))
+- **Motion mode**: plan 2–3 chapters with the spoken script, generate SRT during audio synthesis, and preview a small set of AI pages in the player against the SRT master clock (see [Motion mode](motion-mode.md))
 - Albums & continuous play  
 - Topic graph by theme, with topic search, popular-topic shortcuts, and shared-topic links
 - Library coexists with production jobs  

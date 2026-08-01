@@ -18,6 +18,7 @@ import {
 } from '@bokebox/shared';
 import { jobPaths } from '../../utils/paths.js';
 import { confirmTimeline } from './timelineGate.js';
+import { validateMotionHtml } from './validateMotionHtml.js';
 import fs from 'node:fs/promises';
 
 /* ---- 文本转义 ---- */
@@ -359,7 +360,7 @@ function beatHtml(input: {
         ? `<div class="scene-split"><div class="step"><small>BEFORE</small><strong>${esc(steps[0] || '原来的做法')}</strong></div><i></i><div class="is-focus step"><small>AFTER</small><strong>${esc(steps[1] || sceneTitle)}</strong></div></div>`
         : visual === 'system-layer-expand'
           ? `<div class="scene-layers">${steps.slice(0, 3).map((label, i) => `<div class="layer step"><span>${String(i + 1).padStart(2, '0')}</span><strong>${esc(label)}</strong></div>`).join('')}</div>`
-          : `<div class="scene-lockup${visual === 'path-build' ? '' : ' step step-lock'}"><i></i><span>${primitive}</span></div>`;
+          : `<div class="scene-lockup${visual === 'path-build' ? '' : ' step step-lock'}"><i></i><span>${esc(primitive)}</span></div>`;
   return (
     `<section class="${beatClass}" id="${esc(input.id)}" ` +
     `data-kind="${esc(input.kind)}" data-steps="${steps.length}" ` +
@@ -368,7 +369,7 @@ function beatHtml(input: {
     `data-step-times="${input.stepTimes.join(',')}">` +
     `<div class="scene">` +
     `${brollIndex}` +
-    `<div class="beat-kicker">${kicker}</div>` +
+    `<div class="beat-kicker">${esc(kicker)}</div>` +
     `<h2 class="beat-title" data-safe-box="title">${esc(sceneTitle)}</h2>` +
     (input.scene?.body ? `<p class="beat-body">${esc(input.scene.body)}</p>` : '') +
     `<div class="scene-visual">${visualHtml}</div>` +
@@ -580,12 +581,16 @@ export async function buildMotionHtmlFile(
   jobId: string,
   timeline: MotionTimeline,
 ): Promise<{ ok: true; file: string; bytes: number } | { ok: false; error: string }> {
+  const html = renderMotionHtml(timeline, jobId);
+  const check = validateMotionHtml(html, timeline);
+  if (!check.ok) {
+    return { ok: false, error: `HTML 产物校验失败：${check.errors.join('; ')}` };
+  }
   const confirmed = await confirmTimeline(jobId, timeline);
   if (!confirmed.ok) {
     const codes = confirmed.gate.violations.map((v) => v.code).join(', ');
     return { ok: false, error: `时间轴未通过确认门：${codes}` };
   }
-  const html = renderMotionHtml(timeline, jobId);
   const file = jobPaths(jobId).motionHtml;
   await fs.writeFile(file, html, 'utf8');
   const bytes = Buffer.byteLength(html, 'utf8');

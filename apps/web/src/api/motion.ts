@@ -16,6 +16,7 @@ export interface MotionSrtInfo {
 
 export interface MotionDraftResponse {
   ok: boolean;
+  title: string;
   gate: GateResult | null;
   rows: CoverageRow[];
   beats: MotionBeat[];

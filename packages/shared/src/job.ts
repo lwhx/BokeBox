@@ -43,6 +43,18 @@ export interface PodcastSegment {
   summary: string;
 }
 
+/**
+ * 口播稿生成阶段就确定的 Motion 章节。
+ * script 是该章节的原文片段，按顺序拼接后组成 PodcastContent.script；
+ * TTS 合成后再用同一批片段映射到真实 SRT 毫秒区间。
+ */
+export interface MotionChapter {
+  id: string;
+  title: string;
+  summary: string;
+  script: string;
+}
+
 /** 口播脚本逐行时间轴（用于歌词/跟读对齐） */
 export interface ScriptLineTiming {
   text: string;
@@ -76,6 +88,8 @@ export interface PodcastContent {
   script: string;
   /** 节目笔记（Markdown） */
   showNotes: string;
+  /** 生成口播稿时同步规划的 2–3 个 Motion 章节 */
+  motionChapters?: MotionChapter[];
   /** 知识闪卡（独立 AI 生成） */
   flashcards?: Flashcard[];
   /** 口播逐行时间轴（TTS 合成后写入，跟读对齐） */

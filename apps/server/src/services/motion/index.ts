@@ -31,6 +31,7 @@ import { jobPaths } from '../../utils/paths.js';
 
 export interface MotionDraft {
   ok: boolean;
+  title: string;
   gate: GateResult | null;
   rows: CoverageRow[];
   durationMs: number;
@@ -74,6 +75,7 @@ export async function draftTimeline(job: Job): Promise<MotionDraft> {
   if (!srt) {
     return {
       ok: false,
+      title: job.podcast?.title || job.title,
       gate: null,
       rows: [],
       durationMs: 0,
@@ -91,6 +93,7 @@ export async function draftTimeline(job: Job): Promise<MotionDraft> {
     cues: srt.cues,
     lines,
     outline,
+    chapters: job.podcast?.motionChapters,
   });
 
   const { gate, timeline } = runTimelineGate({
@@ -104,6 +107,7 @@ export async function draftTimeline(job: Job): Promise<MotionDraft> {
 
   return {
     ok: gate.pass,
+    title: job.podcast?.title || job.title,
     gate,
     rows: gate.rows,
     durationMs: srt.durationMs,
@@ -198,8 +202,6 @@ export async function buildFromConfirmed(job: Job): Promise<MotionBuildResult> {
     return { ok: false, timeline, gate, error: 'confirmed-timeline-invalid' };
   }
   const html = renderMotionHtml(timeline, job.id);
-  const file = jobPaths(job.id).motionHtml;
-  await fs.writeFile(file, html, 'utf8');
   const check = validateMotionHtml(html, timeline);
   if (!check.ok) {
     return {
@@ -209,6 +211,8 @@ export async function buildFromConfirmed(job: Job): Promise<MotionBuildResult> {
       error: `html-invalid: ${check.errors.join('; ')}`,
     };
   }
+  const file = jobPaths(job.id).motionHtml;
+  await fs.writeFile(file, html, 'utf8');
   return {
     ok: true,
     timeline,

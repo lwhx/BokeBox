@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
 import type { MotionPageSpec, MotionScene, MotionTimeline } from '@bokebox/shared/motion';
 import {
+  draftMotionTimeline,
   fetchMotionTimeline,
   generateMotionPage,
   motionSrtUrl,
@@ -14,6 +15,19 @@ type Phase =
   | { kind: 'generating' }
   | { kind: 'ready'; timeline: MotionTimeline }
   | { kind: 'error'; message: string };
+
+function timelineFromDraft(jobId: string, draft: Awaited<ReturnType<typeof draftMotionTimeline>>): MotionTimeline {
+  return {
+    version: 1,
+    jobId,
+    title: draft.title,
+    durationMs: draft.durationMs,
+    source: 'srt',
+    srtCueCount: draft.srtInfo?.rawCues || draft.beats.length,
+    optimizedCueCount: draft.srtInfo?.optimizedCues || draft.beats.length,
+    beats: draft.beats,
+  };
+}
 
 function fmtMs(ms: number): string {
   const total = Math.max(0, Math.floor(ms / 1000));
@@ -121,6 +135,15 @@ function MotionPreview({
   const style = page?.style || 'editorial-magazine';
   const totalSec = durationSec > 0 ? durationSec : timeline.durationMs / 1000;
   const progress = totalSec > 0 ? Math.min(100, (currentSec / totalSec) * 100) : 0;
+  const activeStep = beat
+    ? Math.min(
+        scene.bullets.length,
+        1 + beat.stepTimes.filter((time) => time <= nowMs).length,
+      )
+    : 1;
+  const visibleScene = scene.bullets.length > 0
+    ? { ...scene, bullets: scene.bullets.slice(0, Math.max(1, activeStep)) }
+    : scene;
 
   return (
     <div className={['qq-motion-preview', playing ? 'is-playing' : ''].join(' ')}>
@@ -130,12 +153,12 @@ function MotionPreview({
           <span>{scene.eyebrow}</span>
           <span>{fmtMs(nowMs)} / {fmtMs(timeline.durationMs)}</span>
         </div>
-        <div className={['qq-motion-scene', `is-${scene.layout}`, `is-${scene.visual}`].join(' ')}>
+        <div className={['qq-motion-scene', `is-${visibleScene.layout}`, `is-${visibleScene.visual}`].join(' ')}>
           <div className="qq-motion-scene-index">{String(activeIndex + 1).padStart(2, '0')}</div>
           <div className="qq-motion-scene-copy">
-            <h4>{scene.title}</h4>
-            {scene.body && <p>{scene.body}</p>}
-            <MotionVisualGraphic scene={scene} />
+            <h4>{visibleScene.title}</h4>
+            {visibleScene.body && <p>{visibleScene.body}</p>}
+            <MotionVisualGraphic scene={visibleScene} />
           </div>
         </div>
         <div className="qq-motion-canvas-footer">
@@ -189,8 +212,15 @@ export function MotionPanel({
   const load = useCallback(async () => {
     const result = await fetchMotionTimeline(jobId);
     if (result.hasTimeline && result.timeline) setPhase({ kind: 'ready', timeline: result.timeline });
-    else setPhase({ kind: 'idle' });
-  }, [jobId]);
+    else if (loggedIn) {
+      const draft = await draftMotionTimeline(jobId);
+      if (draft.ok && draft.gate?.pass && draft.beats.length) {
+        setPhase({ kind: 'ready', timeline: timelineFromDraft(jobId, draft) });
+      } else {
+        setPhase({ kind: 'idle' });
+      }
+    } else setPhase({ kind: 'idle' });
+  }, [jobId, loggedIn]);
 
   useEffect(() => {
     void load().catch(() => setPhase({ kind: 'error', message: t('motion.error') }));
@@ -235,15 +265,15 @@ export function MotionPanel({
           <h3 className="qq-motion-title">{t('motion.title')}</h3>
           <p className="qq-motion-desc">{t('motion.desc')}</p>
         </div>
-        <div className="qq-motion-status"><i />{timeline ? t('motion.previewReady') : t('motion.notGenerated')}</div>
+        <div className="qq-motion-status"><i />{timeline ? timeline.page ? t('motion.previewReady') : t('motion.planReady') : t('motion.notGenerated')}</div>
       </header>
 
       <section className="qq-motion-create">
         <div className="qq-motion-create-copy">
           <span className="qq-motion-create-number">01</span>
           <div>
-            <strong>{t('motion.createTitle')}</strong>
-            <p>{t('motion.createDesc')}</p>
+            <strong>{timeline?.page ? t('motion.createTitle') : t('motion.planTitle')}</strong>
+            <p>{timeline?.page ? t('motion.createDesc') : t('motion.planDesc')}</p>
           </div>
         </div>
         <div className="qq-motion-prompt-row">
@@ -254,9 +284,15 @@ export function MotionPanel({
             disabled={!loggedIn || busy}
           />
           <button type="button" className="qq-btn is-primary" onClick={generate} disabled={!loggedIn || busy}>
-            {busy ? t('motion.generating') : timeline ? t('motion.regenerate') : t('motion.generate')}
+            {busy ? t('motion.generating') : timeline?.page ? t('motion.regenerate') : t('motion.generate')}
           </button>
         </div>
+        {timeline && !timeline.page && (
+          <div className="qq-motion-plan-strip">
+            <span>{t('motion.planStats', { n: timeline.beats.length })}</span>
+            <span>{timeline.beats.map((beat) => beat.title).join(' / ')}</span>
+          </div>
+        )}
         {!loggedIn && <p className="qq-motion-login-hint">{t('motion.loginHint')}</p>}
       </section>
 
@@ -292,7 +328,7 @@ export function MotionPanel({
               </div>
               <div className="qq-motion-scene-actions">
                 <a href={motionSrtUrl(jobId)}>{t('motion.downloadSrt')}</a>
-                <a href={motionTimelineUrl(jobId, true)} download>{t('motion.downloadHtml')}</a>
+                {timeline.page && <a href={motionTimelineUrl(jobId, true)} download>{t('motion.downloadHtml')}</a>}
               </div>
             </div>
             <div className="qq-motion-scene-list">

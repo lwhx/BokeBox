@@ -157,7 +157,7 @@ docker pull ghcr.io/vastsa/bokebox:latest
 ### 节目资产与听播
 - 任务详情：转写、脚本、笔记、闪卡、封面、音频
 - 沉浸播放器：进度记忆、倍速、睡眠定时（含「播完本集」）
-- **Motion 模式**：把单集变成 SRT 主时钟驱动的 16:9 信息动画（分镜/步骤/收束页绑定真实毫秒点 + P3.5 确认门，见 [docs/guide/motion-mode.md](./docs/guide/motion-mode.md)）
+- **Motion 模式**：口播稿生成时同步规划 2–3 个章节，音频生成时产出 SRT，再把章节变成 SRT 主时钟驱动的 16:9 信息动画（见 [docs/guide/motion-mode.md](./docs/guide/motion-mode.md)）
 - 专辑连续收听；图谱按标签回到相关节目
 
 ### 设置中心

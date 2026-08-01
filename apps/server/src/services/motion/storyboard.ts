@@ -9,6 +9,7 @@
 import type {
   MotionBeat,
   MotionBeatKind,
+  MotionChapter,
   PodcastSegment,
   ScriptLineTiming,
   SrtCue,
@@ -155,6 +156,8 @@ export interface StoryboardInput {
   cues: SrtCue[];
   lines?: ScriptLineTiming[];
   outline?: PodcastSegment[];
+  /** 口播稿生成阶段确定的 2–3 个章节；存在时优先于旧 outline 推断。 */
+  chapters?: MotionChapter[];
 }
 
 export interface StoryboardResult {
@@ -168,6 +171,113 @@ const MAX_BEAT_MS = 30_000;
 const MAX_BEATS = 16;
 /** 空档超过该值时必须插入 broll beat 填充（与门禁 gapLimitMs 对齐） */
 const BROLL_GAP_THRESHOLD_MS = 1500;
+
+function firstSpokenSentence(text: string): string {
+  return String(text || '')
+    .replace(/^\s*[（(][^）)]*[）)]\s*/u, '')
+    .split(/(?<=[。！？!?\.])\s*/u)
+    .map((part) => part.trim())
+    .find(Boolean) || String(text || '').trim();
+}
+
+function findChapterAnchor(
+  chapter: MotionChapter,
+  cues: SrtCue[],
+  fromIndex: number,
+  fallbackProgress: number,
+): number {
+  const needle = firstSpokenSentence(chapter.script);
+  const secondary = `${chapter.title} ${chapter.summary}`.trim();
+  let best = -1;
+  let bestScore = 0;
+  for (let i = fromIndex; i < cues.length; i += 1) {
+    const score = Math.max(
+      overlapScore(needle, cues[i].text),
+      overlapScore(secondary, cues[i].text),
+    );
+    if (score > bestScore) {
+      best = i;
+      bestScore = score;
+    }
+    if (score >= 0.9) break;
+  }
+  if (best >= 0 && bestScore >= 0.22) return best;
+  return Math.min(
+    cues.length - 1,
+    Math.max(fromIndex, Math.round(fallbackProgress * (cues.length - 1))),
+  );
+}
+
+function buildLegacyChapters(input: StoryboardInput): MotionChapter[] {
+  if (input.cues.length < 2) return [];
+  const count = Math.min(3, input.cues.length >= 3 ? 3 : 2);
+  return Array.from({ length: count }, (_, index) => {
+    const start = Math.floor((index * input.cues.length) / count);
+    const end = Math.max(start, Math.floor(((index + 1) * input.cues.length) / count) - 1);
+    const source = input.outline?.[index] || input.outline?.[input.outline.length - 1];
+    return {
+      id: `legacy-${index + 1}`,
+      title: source?.title || (index === 0 ? '开场与问题' : index === count - 1 ? '结论与行动' : '核心观点'),
+      summary: source?.summary || '从已有口播时间轴压缩出的章节。',
+      script: input.cues.slice(start, end + 1).map((cue) => cue.text).join(' '),
+    };
+  });
+}
+
+/**
+ * 新流程：直接消费口播稿生成时确定的章节，不再按每条 SRT cue 生成页面。
+ * 章节窗口覆盖中间的自然停顿，因此页面数量稳定为 2–3 张，SRT 只负责
+ * 在章节内部推进真实音频时钟。
+ */
+function buildChapterStoryboard(input: StoryboardInput): StoryboardResult | null {
+  const chapters = (input.chapters || [])
+    .filter((chapter) => chapter && chapter.title.trim() && chapter.script.trim())
+    .slice(0, 3);
+  if (chapters.length < 2 || chapters.length > input.cues.length || !input.cues.length) return null;
+
+  const starts = [0];
+  for (let i = 1; i < chapters.length; i += 1) {
+    const minIndex = starts[i - 1] + 1;
+    starts.push(findChapterAnchor(chapters[i], input.cues, minIndex, i / Math.max(1, chapters.length - 1)));
+  }
+  // 少量 cue 或重复匹配时，保证每章至少占一条 cue；末章自然覆盖到总时长。
+  for (let i = 1; i < starts.length; i += 1) {
+    starts[i] = Math.max(starts[i], starts[i - 1] + 1);
+    starts[i] = Math.min(starts[i], input.cues.length - 1);
+  }
+
+  const durationMs = input.cues[input.cues.length - 1].endMs;
+  const paired = alignCuesToLines(input.cues, input.lines || []);
+  const beats: MotionBeat[] = chapters.map((chapter, index) => {
+    const startIndex = starts[index];
+    const endIndex = index + 1 < starts.length ? starts[index + 1] - 1 : input.cues.length - 1;
+    const startMs = index === 0 ? 0 : input.cues[startIndex].startMs;
+    // 章节窗口直接延伸到下一章起点，把自然停顿留在当前章节内，避免
+    // 用每个 cue 的 endMs 产生额外 beat/空档。
+    const endMs = index === chapters.length - 1 ? durationMs : input.cues[starts[index + 1]].startMs;
+    const cueCount = Math.max(1, endIndex - startIndex + 1);
+    const stepCount = Math.min(3, Math.max(2, Math.round((endMs - startMs) / 10_000) + 1, cueCount));
+    const anchors = findStepAnchorIndices(paired, startIndex, Math.max(startIndex, endIndex), stepCount);
+    return {
+      id: `b${index + 1}`,
+      chapterId: chapter.id,
+      kind: index === chapters.length - 1 ? 'closing' : 'motion',
+      title: chapter.title,
+      detail: chapter.summary || undefined,
+      startMs,
+      endMs,
+      stepTimes: anchors.map((anchor) => input.cues[anchor].startMs),
+      stepLabels: anchors
+        .map((anchor) => shortTitleFromCues(input.cues, anchor, Math.min(anchor + 1, endIndex), 18))
+        .filter(Boolean),
+      cueRange: [startIndex + 1, endIndex + 1],
+    };
+  });
+  return {
+    beats,
+    notes: [`使用口播稿预先规划的 ${chapters.length} 个 Motion 章节，页面数量固定为 ${chapters.length} 张`],
+  };
+}
 
 /* ---- 屏幕文字提炼（屏幕文字短于口播，去开场白与语气词） ---- */
 
@@ -214,6 +324,12 @@ export function buildStoryboard(input: StoryboardInput): StoryboardResult {
   const paired = alignCuesToLines(cues, input.lines || []);
 
   if (!cues.length) return { beats: [], notes: notes.concat('没有可用 cue，无法分镜') };
+
+  const chapterStory = buildChapterStoryboard({
+    ...input,
+    chapters: input.chapters?.length ? input.chapters : buildLegacyChapters(input),
+  });
+  if (chapterStory) return chapterStory;
 
   // 0) 扫描 cue 级大空档（> 门限）：作为强制切分点，保证后续 broll 能填充，
   //    画面不会在口播停止时空等（skill：每个区间必须属于 motion 或 broll）。

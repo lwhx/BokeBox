@@ -4,7 +4,7 @@ description: Motion mode — generate an AI-driven 16:9 page from the spoken scr
 
 # Motion Mode (Info Animation)
 
-Motion turns a finished podcast episode into a **16:9 online information page**. AI reads the spoken script and outline to create the visual hierarchy, short titles, bullets, and layouts. SRT / `script-timing` remains the single master clock so every scene follows the real narration.
+Motion turns a finished podcast episode into a **16:9 online information page**. The script stage first plans 2–3 primary chapters, and audio synthesis produces the measured SRT alongside the audio. AI designs one visual page per chapter; SRT / `script-timing` then advances the real narration clock inside each chapter.
 
 The page is previewed directly inside the player. A single-file HTML download remains available as a secondary path for recording and offline sharing.
 
@@ -14,12 +14,12 @@ The page generator also follows Jacky-motion's method: lock one style and inform
 
 ## Generate in the player
 
-1. Open an episode with synthesized audio and a spoken script.
+1. Generate or regenerate an episode; the pipeline produces a chaptered script, synthesized audio, and `podcast.srt` together.
 2. Switch to the **Motion** panel.
-3. Add a visual direction, for example “restrained like an Apple keynote, with three clear takeaways”.
-4. Click **Generate page**. AI reads the script, outline, and fixed timeline.
-5. Play the audio. The page preview, scrubber, and scene list follow it in real time.
-6. Click a scene card to seek. Download HTML only when recording or sharing offline.
+3. Review the prepared 2–3 chapter cards; boundaries come from the script instead of being guessed from every subtitle cue.
+4. Add a visual direction, for example “restrained like an Apple keynote, with three clear takeaways”.
+5. Click **Generate page**. AI creates one visual page per fixed chapter, keeping the page count at 2–3.
+6. Play the audio. Chapter changes and in-chapter steps follow the SRT in real time. Download HTML only when recording or sharing offline.
 
 Without an LLM key, Motion creates a deterministic base page so preview still works. With an LLM configured, the visual content comes from the AI page generator.
 
@@ -27,27 +27,27 @@ Without an LLM key, Motion creates a deterministic base page so preview still wo
 
 | Stage | What happens |
 | --- | --- |
-| **S1 Optimize SRT** | Read `podcast.srt`; fall back to `script-timing.json` or embedded job timing, and recover timing from existing audio plus the spoken script when needed; then merge fragments, split overlong cues, repair overlaps, and report coverage |
-| **S2 Master clock** | Total duration = end of the last optimized cue; the whole timeline uses milliseconds as its single reference |
-| **S3 Storyboard** | Outline segments → beats (boundaries pinned to anchor cue `startMs`); without an outline, split by character weight; last beat is the closing page |
-| **S3.5 P3.5 gate** | Full-coverage check: first beat starts at 0ms, gaps ≤1500ms, no overlapping beats, step ms strictly increasing within the window, closing page aligns with the master clock (±300ms) |
-| **S4 AI page** | AI locks the style, layout skeleton, and information primitive before filling the visual layer |
-| **S5 Preview / export** | The React player follows audio in real time; `motion.html` remains available for recording |
+| **S1 Chaptered script** | AI returns 2–3 `motionChapters` alongside `script`. Each chapter has a title, summary, and spoken fragment ready for TTS; the full script is the ordered chapter text joined with blank lines |
+| **S2 Audio + SRT** | TTS synthesizes sentence chunks and writes measured `script-timing.json` and `podcast.srt` using speech ranges and pauses; Motion now has both its structure and real clock |
+| **S3 Chapter timeline** | Map each chapter's opening sentence to a real SRT cue. Chapter windows absorb natural pauses, so page count does not grow with subtitle fragmentation |
+| **S3.5 P3.5 gate** | Check that the first chapter starts at 0ms, chapters do not overlap, the closing chapter reaches the master duration, step ms values are valid, and the final beat is `closing` |
+| **S4 AI page** | AI locks one style, layout skeleton, and information primitive for the fixed chapters; one primary page per chapter |
+| **S5 Preview / export** | The React player switches between 2–3 pages in real time; `motion.html` remains available for recording |
 
 ## Generate from the player
 
 The timeline is locked in `motion-timeline.json`; regenerating the AI page does not change the original script, audio, or SRT.
 
-## Storyboard & B-roll
+## Chapters & scenes
 
-- **motion beat**: information chapter page; title is a distilled short on-screen text (opening fillers stripped, shorter than the narration); steps reveal one by one following narration rhythm (2–5 steps), each pinned to the `startMs` of a semantic trigger cue
-- **broll beat**: large silent gaps (≥1.5 s, common at paragraph breaks / music) first split the surrounding beats at a forced cut point, then are filled with a real broll transition page (large index number + preview title) so the picture never idles while narration pauses; the gate treats broll as a regular beat in coverage checks. Gaps under 1.5 s are normal narration pace and stay inside the beat (automated storyboarding does not split them)
-- **closing beat**: the final recap page whose `endMs` hugs the master clock duration (±300 ms) and freezes on the last frame
+- **chapter beat**: a fixed chapter from the script stage, one page per chapter; title and summary are decided upstream, while step ms values come from the chapter's SRT cues
+- **natural pauses**: sentence gaps stay inside the current chapter window instead of creating B-roll pages; long episodes do not produce dozens of subtitle cards
+- **closing beat**: the final spoken chapter, whose `endMs` hugs the master clock duration (±300 ms) and freezes on the last frame
 
 ### Page and motion rules
 
 - Information primitives are Claim, Contrast, Path, System, and Evidence; each beat chooses one primary primitive.
-- Core beats use the four-part camera language `glance → reconstruct → push → lock` and finish on a screenshot-ready final frame.
+- Each chapter gets one primary visual page with only a few in-chapter reveals, and finishes on a screenshot-ready final frame.
 - The style is locked for the episode; AI does not randomly change the visual language between adjacent scenes.
 
 ## HTML player
@@ -88,5 +88,6 @@ BokeBox's Motion mode is adapted from [jacky-motion](https://github.com/jackywxs
 - Use a deterministic fallback page when no LLM is configured so preview is never blocked
 - Coverage table / gate rules aligned directly with BokeBox's millisecond TTS timeline
 - Pure logic (parse / optimize / gate) lives in `@bokebox/shared`, shared by server and web to avoid rule drift
-- B-roll implemented as "forced cut + fill": large silences first split the beat, then become broll pages, keeping the gate passable and the picture alive
-- Gate gap limit relaxed from 500 ms to 1500 ms: automated storyboarding cannot fill gaps as finely as a human; TTS inter-sentence pauses up to ~1.5 s are normal narration pace; ≥1.5 s still forces a broll fill
+- Chapters are fixed upstream while the spoken script is generated, so Motion does not reverse-engineer page structure after audio is complete
+- Audio synthesis writes the real `podcast.srt`; Motion does not need a public download request to recover timing on demand
+- Page count is controlled by the 2–3 chapter plan, not by the number of subtitle cues

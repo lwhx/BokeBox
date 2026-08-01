@@ -8,6 +8,27 @@ function cue(startMs: number, endMs: number, text: string): SrtCue {
 }
 
 describe('motion storyboard (server)', () => {
+  it('uses upstream motion chapters and keeps the page count at two or three', () => {
+    const cues: SrtCue[] = [
+      cue(0, 4000, '先说结论，这个方法会改变内容生产。'),
+      cue(4500, 9000, '第一章继续解释为什么要改变节奏。'),
+      cue(18000, 23000, '第二章只保留真正有用的观点。'),
+      cue(23500, 29000, '最后把方法变成可以重复的行动。'),
+    ];
+    const chapters = [
+      { id: 'hook', title: '先说结论', summary: '先给听众一个明确方向。', script: '先说结论，这个方法会改变内容生产。' },
+      { id: 'core', title: '保留重点', summary: '只保留真正有用的观点。', script: '第二章只保留真正有用的观点。' },
+      { id: 'close', title: '变成行动', summary: '把方法变成可重复的行动。', script: '最后把方法变成可以重复的行动。' },
+    ];
+    const story = buildStoryboard({ title: '测试', cues, chapters });
+    assert.equal(story.beats.length, 3);
+    assert.deepEqual(story.beats.map((b) => b.kind), ['motion', 'motion', 'closing']);
+    assert.deepEqual(story.beats.map((b) => b.chapterId), ['hook', 'core', 'close']);
+    assert.equal(story.beats.some((b) => b.kind === 'broll'), false);
+    const gate = validateTimeline(story.beats, cues[cues.length - 1].endMs);
+    assert.equal(gate.pass, true);
+  });
+
   it('first beat always starts at 0ms even when the outline anchor lands mid-narration', () => {
     const cues: SrtCue[] = [
       cue(0, 4200, '大家好，欢迎收听不上班实验室，我是兰。'),
@@ -33,7 +54,7 @@ describe('motion storyboard (server)', () => {
     assert.deepEqual(gate.violations, []);
   });
 
-  it('broll fills a large silence inside an outline segment', () => {
+  it('keeps large silences inside compact chapter windows', () => {
     const cues: SrtCue[] = [
       cue(0, 4000, '第一段开场口播，介绍今天的话题。'),
       cue(4600, 9000, '这一段讲背景信息，补充一些细节。'),
@@ -45,10 +66,9 @@ describe('motion storyboard (server)', () => {
     ];
     const outline = [{ title: '完整段落', summary: '含长静音的段落' }];
     const story = buildStoryboard({ title: '测试', cues, outline });
-    const brolls = story.beats.filter((b) => b.kind === 'broll');
-    assert.equal(brolls.length, 1, '8s 静音应生成 1 个 broll beat（600ms 句间停顿不生成）');
-    assert.equal(brolls[0].startMs, 13000);
-    assert.equal(brolls[0].endMs, 21000);
+    assert.ok(story.beats.length <= 3, '页面数量应保持在 3 张以内');
+    assert.equal(story.beats.some((b) => b.kind === 'broll'), false);
+    assert.equal(story.beats[0].startMs, 0);
     const gate = validateTimeline(story.beats, cues[cues.length - 1].endMs);
     assert.equal(gate.pass, true);
   });

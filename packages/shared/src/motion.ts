@@ -312,6 +312,8 @@ export type MotionBeatKind = 'motion' | 'broll' | 'closing';
 export interface MotionBeat {
   /** 稳定 id，如 b1 / b2…，收束页为 bn+1 */
   id: string;
+  /** 上游口播稿生成时确定的章节 id；旧任务可缺省 */
+  chapterId?: string;
   kind: MotionBeatKind;
   /** 屏幕文字（核心信息，短于口播，视觉索引） */
   title: string;
@@ -403,6 +405,7 @@ export type GateViolationCode =
   | 'step-not-monotonic'
   | 'step-count-mismatch'
   | 'closing-not-at-end'
+  | 'closing-kind'
   | 'empty-beat'
   | 'unsorted';
 
@@ -558,6 +561,13 @@ export function validateTimeline(
   }
 
   const lastBeat = sorted[sorted.length - 1];
+  if (lastBeat.kind !== 'closing') {
+    violations.push({
+      code: 'closing-kind',
+      beatId: lastBeat.id,
+      message: `最后一个 beat 必须是 closing，实际为 ${lastBeat.kind}`,
+    });
+  }
   if (Math.abs(lastBeat.endMs - durationMs) > endToleranceMs) {
     violations.push({
       code: 'closing-not-at-end',

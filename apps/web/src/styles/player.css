@@ -2545,6 +2545,28 @@ html[data-theme="dark"] .qq-lyrics-return {
   border-color: var(--brand-2);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-2) 13%, transparent);
 }
+.qq-motion-plan-strip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 9px 11px;
+  border: 1px solid color-mix(in srgb, var(--brand-2) 22%, var(--separator));
+  border-radius: 10px;
+  color: var(--text-3);
+  background: color-mix(in srgb, var(--brand-soft) 32%, transparent);
+  font-size: 11px;
+}
+.qq-motion-plan-strip span:first-child {
+  flex: none;
+  color: var(--brand-2);
+  font: 700 10px var(--font-mono, ui-monospace);
+}
+.qq-motion-plan-strip span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .qq-motion-login-hint {
   margin: 8px 0 0;
   color: var(--text-3);

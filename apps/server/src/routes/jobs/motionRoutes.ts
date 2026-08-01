@@ -25,6 +25,7 @@ import {
   generateAndBuild,
   readConfirmedTimeline,
 } from '../../services/motion/index.js';
+import { loadOptimizedSrt } from '../../services/motion/srtOptimizer.js';
 
 const MOTION_BEAT_MAX = 16;
 
@@ -79,6 +80,7 @@ export async function motionRoutes(app: FastifyInstance): Promise<void> {
         ),
         data: {
           error: draft.error || 'gate-failed',
+          title: draft.title,
           gate: draft.gate,
           rows: draft.rows,
           beats: draft.beats,
@@ -91,6 +93,7 @@ export async function motionRoutes(app: FastifyInstance): Promise<void> {
     }
     return {
       ok: true,
+      title: draft.title,
       gate: draft.gate,
       rows: draft.rows,
       beats: draft.beats,
@@ -203,8 +206,9 @@ export async function motionRoutes(app: FastifyInstance): Promise<void> {
       if (!requireUser(req) && !isPubliclyListenable(job)) {
         return reply.code(404).send({ error: t(getRequestLocale(req), 'job.notFound') });
       }
-      const draft = await draftTimeline(job);
-      const body = draft.srtInfo?.optimizedSrtText;
+      // 下载是只读出口：不在游客 GET 中触发旧任务的音频恢复或写文件。
+      const srt = await loadOptimizedSrt(job.id);
+      const body = srt?.optimizedSrtText;
       if (!body) {
         return reply.code(404).send({ error: t(getRequestLocale(req), 'job.srtMissing') });
       }
