@@ -350,17 +350,47 @@ export type MotionVisual =
   | 'number-count'
   | 'quote-lock';
 
+/**
+ * 场景级构图。style 只负责整集的色彩基底，composition 决定每一页
+ * 的实际 HTML 结构，避免所有 beat 都落回同一张卡片模板。
+ */
+export type MotionSceneVariant =
+  | 'hook-slam'
+  | 'diagonal-reveal'
+  | 'signal-bars'
+  | 'before-after'
+  | 'stack-cascade'
+  | 'quote-cut'
+  | 'ticker-drive'
+  | 'closing-lock';
+
+/** 场景入场节奏，使用 transform / opacity / clip-path 实现离线动效。 */
+export type MotionSceneMotion =
+  | 'slam'
+  | 'wipe'
+  | 'scan'
+  | 'cascade'
+  | 'drift'
+  | 'type-on'
+  | 'pulse';
+
 /** AI 根据口播稿生成的视觉页面内容；时间仍由 MotionBeat/SRT 唯一决定。 */
 export interface MotionScene {
   beatId: string;
   layout: MotionSceneLayout;
   primitive: MotionPrimitive;
   visual: MotionVisual;
+  /** 场景独立构图；旧任务缺省时由渲染端按 beat 推导。 */
+  variant?: MotionSceneVariant;
+  /** 场景独立入场节奏；旧任务缺省时由渲染端按 variant 推导。 */
+  motion?: MotionSceneMotion;
   eyebrow: string;
   title: string;
   body: string;
   bullets: string[];
   accent: string;
+  /** 第二强调色，允许同一集保持识别度又让相邻场景换气。 */
+  accent2?: string;
 }
 
 export interface MotionPageSpec {

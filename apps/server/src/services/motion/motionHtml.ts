@@ -14,6 +14,8 @@
 import {
   formatMotionClock,
   type MotionScene,
+  type MotionSceneMotion,
+  type MotionSceneVariant,
   type MotionTimeline,
 } from '@bokebox/shared';
 import { jobPaths } from '../../utils/paths.js';
@@ -122,6 +124,7 @@ function runtimeScript(): string {
     var target = step || 1;
     Array.prototype.forEach.call(beats, function (b, i) {
       b.classList.toggle('active', b === beat);
+      b.classList.remove('is-entering');
     });
     if (beat) {
       Array.prototype.forEach.call(beat.querySelectorAll('.step'), function (el, i) {
@@ -132,6 +135,14 @@ function runtimeScript(): string {
     state.beat = beats.indexOf(beat);
     state.step = target;
     if (document.body) document.body.classList.remove('animating');
+  }
+
+  /* 同一文件内每个 beat 都有自己的入场编排，重播时强制重置 CSS 动画。 */
+  function replayBeat(beat) {
+    if (!beat) return;
+    beat.classList.remove('is-entering');
+    void beat.offsetWidth;
+    beat.classList.add('is-entering');
   }
 
   function animateStepIn(beat, step) {
@@ -161,6 +172,7 @@ function runtimeScript(): string {
     if (!sameBeat) {
       if (animate && targetStep === 1) {
         settle(item.beat, 1);
+        replayBeat(item.beat);
         animateStepIn(item.beat, 1);
       } else {
         settle(item.beat, targetStep);
@@ -194,11 +206,20 @@ function runtimeScript(): string {
   function startAutoplayClock() {
     if (!AUTO_ENABLED) return;
     if (playback.offsetMs >= durationMs) playback.offsetMs = 0;
+    var firstRun = !playback.started;
     playback.started = true;
     playback.running = true;
     playback.startedAt = performance.now();
     if (gate) gate.hidden = true;
     document.body.classList.add('autoplay-running');
+    if (firstRun) {
+      var startItem = schedule[0];
+      for (var i = 0; i < schedule.length; i++) {
+        if (schedule[i].startMs <= playback.offsetMs) startItem = schedule[i];
+        else break;
+      }
+      replayBeat(startItem.beat);
+    }
     cancelAnimationFrame(playback.frame);
     playback.frame = requestAnimationFrame(autoplayTick);
   }
@@ -300,6 +321,78 @@ function runtimeScript(): string {
 }
 
 /* ---- beat 内容模板 ---- */
+const SCENE_VARIANTS: MotionSceneVariant[] = [
+  'hook-slam',
+  'diagonal-reveal',
+  'signal-bars',
+  'before-after',
+  'stack-cascade',
+  'quote-cut',
+  'ticker-drive',
+  'closing-lock',
+];
+const SCENE_MOTIONS: MotionSceneMotion[] = [
+  'slam',
+  'wipe',
+  'scan',
+  'cascade',
+  'drift',
+  'type-on',
+  'pulse',
+];
+
+function safeHex(value: unknown, fallback: string): string {
+  return /^#[0-9a-f]{6}$/i.test(String(value || ''))
+    ? String(value)
+    : fallback;
+}
+
+function deriveVariant(
+  scene: MotionScene | undefined,
+  kind: string,
+  index: number,
+): MotionSceneVariant {
+  if (scene?.variant && SCENE_VARIANTS.includes(scene.variant)) return scene.variant;
+  if (kind === 'closing') return 'closing-lock';
+  if (kind === 'broll') return 'diagonal-reveal';
+  if (index === 0) return 'hook-slam';
+  if (scene?.visual === 'number-count') return 'signal-bars';
+  if (scene?.visual === 'split-compare') return 'before-after';
+  if (scene?.visual === 'path-build') return 'stack-cascade';
+  if (scene?.visual === 'quote-lock') return 'quote-cut';
+  return SCENE_VARIANTS[(index - 1) % (SCENE_VARIANTS.length - 1)];
+}
+
+function deriveMotion(
+  scene: MotionScene | undefined,
+  variant: MotionSceneVariant,
+  index: number,
+): MotionSceneMotion {
+  if (scene?.motion && SCENE_MOTIONS.includes(scene.motion)) return scene.motion;
+  const byVariant: Partial<Record<MotionSceneVariant, MotionSceneMotion>> = {
+    'hook-slam': 'slam',
+    'diagonal-reveal': 'wipe',
+    'signal-bars': 'scan',
+    'before-after': 'drift',
+    'stack-cascade': 'cascade',
+    'quote-cut': 'type-on',
+    'ticker-drive': 'pulse',
+    'closing-lock': 'slam',
+  };
+  return byVariant[variant] || SCENE_MOTIONS[index % SCENE_MOTIONS.length];
+}
+
+function uniqueMotionLabels(values: string[], title: string): string[] {
+  const seen = new Set<string>();
+  return values
+    .map((value) => String(value || '').replace(/\s+/gu, ' ').trim())
+    .filter((value) => {
+      if (!value || value === title || seen.has(value)) return false;
+      seen.add(value);
+      return true;
+    })
+    .slice(0, 4);
+}
 function beatHtml(input: {
   id: string;
   kind: string;
@@ -310,15 +403,15 @@ function beatHtml(input: {
   endMs: number;
   stepTimes: number[];
   scene?: MotionScene;
+  index: number;
 }): string {
   const sceneTitle = input.scene?.title || input.title;
   const steps = input.kind === 'broll'
     ? []
-    : input.scene?.bullets?.length
-      ? input.scene.bullets
-      : input.stepLabels.length
-      ? input.stepLabels
-      : [sceneTitle];
+    : uniqueMotionLabels(
+      input.scene?.bullets?.length ? input.scene.bullets : input.stepLabels,
+      sceneTitle,
+    );
   const stepNodes = steps
     .map((label, i) => {
       const isLast = i === steps.length - 1;
@@ -332,6 +425,8 @@ function beatHtml(input: {
     .join('');
   const isClosing = input.kind === 'closing';
   const isBroll = input.kind === 'broll';
+  const variant = deriveVariant(input.scene, input.kind, input.index);
+  const motion = deriveMotion(input.scene, variant, input.index);
   const visual = input.scene?.visual || (isClosing ? 'quote-lock' : steps.length > 1 ? 'path-build' : 'claim-lockup');
   const primitive = input.scene?.primitive || (steps.length > 1 ? 'Path' : 'Claim');
   const layoutSkeleton = input.scene?.layout === 'closing'
@@ -348,32 +443,42 @@ function beatHtml(input: {
     : isClosing
       ? '收束 · 总结'
       : `章节 ${input.cueRange[0]}–${input.cueRange[1]}`);
-  const beatClass = `beat${isClosing ? ' beat-closing' : ''}${isBroll ? ' beat-broll' : ''}`;
+  const sceneAccent = safeHex(input.scene?.accent, '#e85d36');
+  const sceneAccent2 = safeHex(input.scene?.accent2, '#fbbf24');
+  const beatClass = [
+    'beat',
+    'beat-' + variant,
+    'motion-' + motion,
+    isClosing ? 'beat-closing' : '',
+    isBroll ? 'beat-broll' : '',
+  ].filter(Boolean).join(' ');
   const brollIndex = isBroll
     ? `<div class="broll-index">${String(parseInt(input.id.replace(/\D+/gu, ''), 10) || 1).padStart(2, '0')}</div>`
     : '';
   const visualHtml = visual === 'number-count'
-    ? `<div class="scene-number step step-lock"><strong>${String(steps.length || 1).padStart(2, '0')}</strong><span>KEY POINTS</span></div>`
+    ? `<div class="scene-number"><strong>${String(steps.length || 1).padStart(2, '0')}</strong><span>KEY POINTS</span></div>`
     : visual === 'quote-lock'
-      ? `<blockquote class="scene-quote step step-lock">${esc(input.scene?.body || sceneTitle)}</blockquote>`
+      ? `<blockquote class="scene-quote">${esc(input.scene?.body || sceneTitle)}</blockquote>`
       : visual === 'split-compare'
-        ? `<div class="scene-split"><div class="step"><small>BEFORE</small><strong>${esc(steps[0] || '原来的做法')}</strong></div><i></i><div class="is-focus step"><small>AFTER</small><strong>${esc(steps[1] || sceneTitle)}</strong></div></div>`
+        ? `<div class="scene-split"><div><small>BEFORE</small><strong>${esc(steps[0] || '原来的做法')}</strong></div><i></i><div class="is-focus"><small>AFTER</small><strong>${esc(steps[1] || sceneTitle)}</strong></div></div>`
         : visual === 'system-layer-expand'
-          ? `<div class="scene-layers">${steps.slice(0, 3).map((label, i) => `<div class="layer step"><span>${String(i + 1).padStart(2, '0')}</span><strong>${esc(label)}</strong></div>`).join('')}</div>`
-          : `<div class="scene-lockup${visual === 'path-build' ? '' : ' step step-lock'}"><i></i><span>${esc(primitive)}</span></div>`;
+          ? `<div class="scene-layers">${steps.slice(0, 3).map((label, i) => `<div class="layer"><span>${String(i + 1).padStart(2, '0')}</span><strong>${esc(label)}</strong></div>`).join('')}</div>`
+          : `<div class="scene-lockup"><i></i><span>${esc(primitive)}</span></div>`;
   return (
     `<section class="${beatClass}" id="${esc(input.id)}" ` +
     `data-kind="${esc(input.kind)}" data-steps="${steps.length}" ` +
     `data-layout="${layoutSkeleton}" data-primitive="${esc(primitive)}" data-visual-demo="${esc(visual)}" ` +
-    `data-start-ms="${input.startMs}" data-end-ms="${input.endMs}" ` +
-    `data-step-times="${input.stepTimes.join(',')}">` +
+    `data-variant="${variant}" data-motion="${motion}" data-start-ms="${input.startMs}" data-end-ms="${input.endMs}" ` +
+    `style="--scene-accent:${sceneAccent};--scene-accent-2:${sceneAccent2};--scene-order:${input.index}" data-step-times="${input.stepTimes.join(',')}">` +
+    `<div class="scene-backdrop" aria-hidden="true"><i class="backdrop-glow"></i><i class="backdrop-line"></i><i class="backdrop-grid"></i></div>` +
     `<div class="scene">` +
     `${brollIndex}` +
-    `<div class="beat-kicker">${esc(kicker)}</div>` +
-    `<h2 class="beat-title" data-safe-box="title">${esc(sceneTitle)}</h2>` +
+    `<div class="scene-meta"><div class="beat-kicker">${esc(kicker)}</div><span class="scene-counter">${String(input.index + 1).padStart(2, '0')} / ${esc(input.kind.toUpperCase())}</span></div>` +
+    `<div class="scene-copy"><h2 class="beat-title" data-safe-box="title">${esc(sceneTitle)}</h2>` +
     (input.scene?.body ? `<p class="beat-body">${esc(input.scene.body)}</p>` : '') +
-    `<div class="scene-visual">${visualHtml}</div>` +
+    `<div class="scene-visual">${visualHtml}</div></div>` +
     `<div class="beat-steps visual-${esc(visual)}">${stepNodes}</div>` +
+    `<div class="scene-footer"><span>${esc(primitive)} / ${esc(variant)}</span><span>${esc(input.stepTimes.length ? 'SRT REVEAL' : 'LOCK FRAME')}</span></div>` +
     `</div></section>`
   );
 }
@@ -435,12 +540,120 @@ body.style-finance-studio-cards .scene-layers .layer{background:rgba(45,212,191,
 `;
 }
 
+/** 录屏向动效覆盖层：每个 scene 通过 variant + motion 组合出独立构图。 */
+function kineticMotionCss(): string {
+  return String.raw`
+/* wide composition */
+.scene{padding:104px 132px 82px;overflow:hidden}
+.scene-meta,.scene-footer{position:relative;z-index:4;display:flex;align-items:center;justify-content:space-between;gap:24px}
+.scene-meta{margin-bottom:38px}
+.scene-counter{color:var(--motion-muted,var(--mute));font:700 16px/1.2 var(--font-mono,ui-monospace);letter-spacing:.12em;text-transform:uppercase}
+.scene-copy{position:relative;z-index:3;max-width:1480px}
+.beat-title{max-width:1480px;margin:0;color:var(--motion-ink,var(--ink,var(--text)));font-size:110px;line-height:1.05;letter-spacing:-.045em;text-wrap:balance;word-break:keep-all}
+.beat-body{max-width:820px;margin:26px 0 0;color:var(--motion-muted,var(--mute));font-size:28px;line-height:1.45}
+.scene-visual{position:relative;z-index:3;margin-top:42px;max-width:1280px}
+.beat-steps,.beat-steps:not(.visual-path-build){position:relative;z-index:3;display:grid;gap:10px;max-width:900px;margin-top:28px}
+.beat-steps:empty{display:none}
+.scene-footer{margin-top:auto;padding-top:16px;border-top:1px solid var(--motion-rule,var(--rule));color:var(--motion-muted,var(--mute));font:700 14px/1.2 var(--font-mono,ui-monospace);letter-spacing:.12em;text-transform:uppercase}
+.scene-backdrop{position:absolute;inset:0;overflow:hidden;pointer-events:none}
+.backdrop-glow{position:absolute;width:820px;height:820px;right:-190px;top:-280px;border-radius:50%;background:radial-gradient(circle,color-mix(in srgb,var(--scene-accent) 25%,transparent),transparent 68%);filter:blur(8px);opacity:.72}
+.backdrop-line{position:absolute;width:1350px;height:2px;right:-210px;top:64%;transform:rotate(-18deg);transform-origin:right center;background:linear-gradient(90deg,transparent,var(--scene-accent),var(--scene-accent-2),transparent);opacity:.45}
+.backdrop-grid{position:absolute;inset:0;opacity:.2;background-image:linear-gradient(var(--motion-rule,var(--rule)) 1px,transparent 1px),linear-gradient(90deg,var(--motion-rule,var(--rule)) 1px,transparent 1px);background-size:96px 96px;mask-image:linear-gradient(135deg,#000,transparent 72%)}
+.step{min-height:54px;display:flex;align-items:center;gap:16px;opacity:0;transform:translateY(18px);will-change:transform,opacity}
+.step.on{opacity:1;transform:none;transition:opacity .44s cubic-bezier(.16,1,.3,1),transform .58s cubic-bezier(.16,1,.3,1)}
+.step.settled{transition:none}
+.step-marker{flex:none;color:var(--scene-accent);font:800 16px/1 var(--font-mono,ui-monospace);letter-spacing:.08em}
+.step-text{color:var(--motion-ink,var(--ink,var(--text)));font-size:24px;line-height:1.3}
+.scene-lockup{display:flex;align-items:center;gap:14px;color:var(--scene-accent);font:800 17px/1 var(--font-mono,ui-monospace);letter-spacing:.15em}
+.scene-lockup i{display:block;width:88px;height:2px;background:linear-gradient(90deg,var(--scene-accent),var(--scene-accent-2))}
+.scene-number{display:flex;align-items:baseline;gap:18px;color:var(--scene-accent)}
+.scene-number strong{font:850 250px/.86 var(--font-mono,ui-monospace);letter-spacing:-.07em}
+.scene-number span{color:var(--motion-muted,var(--mute));font:700 18px/1 var(--font-mono,ui-monospace);letter-spacing:.15em}
+.scene-quote{max-width:980px;margin:0;padding-left:24px;border-left:5px solid var(--scene-accent);color:var(--motion-ink,var(--ink,var(--text)));font:750 52px/1.25 Georgia,"Songti SC",serif}
+.scene-split{display:grid;grid-template-columns:1fr 44px 1fr;max-width:1120px;align-items:stretch;border-top:2px solid var(--motion-rule,var(--rule));border-bottom:2px solid var(--motion-rule,var(--rule))}
+.scene-split>div{display:grid;gap:16px;align-content:center;min-height:170px;padding:26px 30px}
+.scene-split>div.is-focus{background:color-mix(in srgb,var(--scene-accent) 12%,transparent)}
+.scene-split small{color:var(--motion-muted,var(--mute));font:800 15px/1 var(--font-mono,ui-monospace);letter-spacing:.15em}
+.scene-split strong{color:var(--motion-ink,var(--ink,var(--text)));font-size:32px;line-height:1.3}
+.scene-split>i{width:1px;height:65%;align-self:center;background:var(--scene-accent)}
+.scene-layers{display:grid;gap:10px;max-width:1000px}
+.scene-layers .layer{display:grid;grid-template-columns:58px 1fr;gap:18px;align-items:center;padding:15px 20px;border-left:4px solid var(--scene-accent);border-bottom:1px solid var(--motion-rule,var(--rule));background:color-mix(in srgb,var(--scene-accent) 8%,transparent)}
+.scene-layers .layer span{color:var(--scene-accent);font:800 16px/1 var(--font-mono,ui-monospace)}
+.scene-layers .layer strong{color:var(--motion-ink,var(--ink,var(--text)));font-size:28px}
+/* each variant changes the crop, hierarchy, and entrance—not just the accent */
+.beat-hook-slam .scene{justify-content:center}
+.beat-hook-slam .beat-title{max-width:1360px;font-size:144px}
+.beat-hook-slam .scene-meta{margin-bottom:32px}
+.beat-hook-slam .scene-copy::after{content:"";display:block;width:360px;height:9px;margin-top:34px;background:linear-gradient(90deg,var(--scene-accent),var(--scene-accent-2),transparent);transform:skewX(-26deg);transform-origin:left}
+.beat-diagonal-reveal .scene{justify-content:flex-end;padding-bottom:150px}
+.beat-diagonal-reveal .scene-copy{max-width:1320px;transform:rotate(-1.2deg)}
+.beat-diagonal-reveal .beat-title{max-width:1240px;font-size:104px}
+.beat-diagonal-reveal .scene-visual{padding-left:50px}
+.beat-signal-bars .scene-copy{max-width:1420px}
+.beat-signal-bars .beat-title{max-width:1000px}
+.beat-signal-bars .scene-number strong{font-size:290px}
+.beat-before-after .scene-copy{max-width:1460px}
+.beat-before-after .scene-split{margin-top:10px}
+.beat-stack-cascade .scene-copy{max-width:1340px}
+.beat-stack-cascade .beat-title{max-width:1160px}
+.beat-quote-cut .scene{justify-content:center;padding-left:204px}
+.beat-quote-cut .beat-title{max-width:1200px;font:800 104px/1.06 Georgia,"Songti SC",serif;letter-spacing:-.03em}
+.beat-quote-cut .scene-visual{margin-top:34px}
+.beat-ticker-drive .scene-copy{max-width:1510px}
+.beat-ticker-drive .beat-title{font-size:96px}
+.beat-ticker-drive .scene-copy::before{content:"///";position:absolute;right:0;top:-70px;color:var(--scene-accent);font:800 24px/1 var(--font-mono,ui-monospace);letter-spacing:.2em}
+.beat-closing-lock .scene{align-items:center;text-align:center}
+.beat-closing-lock .scene-copy{max-width:1360px}
+.beat-closing-lock .beat-title{max-width:1360px;font-size:106px}
+.beat-closing-lock .scene-meta,.beat-closing-lock .scene-footer{width:100%;text-align:left}
+.beat-broll .scene{align-items:center;justify-content:center;text-align:center}
+.beat-broll .scene-copy{max-width:1280px}
+.beat-broll .beat-title{font-size:86px}
+.beat-broll .scene-meta,.beat-broll .scene-footer{width:100%}
+/* real entrance motion, replayed by the requestAnimationFrame clock */
+.beat.active.is-entering .backdrop-glow{animation:motion-glow-in 1.15s cubic-bezier(.16,1,.3,1) both}
+.beat.active.is-entering .backdrop-line{animation:motion-line-in 1s cubic-bezier(.16,1,.3,1) both}
+.beat.active.is-entering .scene-meta{animation:motion-meta-in .48s cubic-bezier(.16,1,.3,1) both}
+.beat.active.is-entering .beat-title{animation:motion-title-in .72s .08s cubic-bezier(.16,1,.3,1) both}
+.beat.active.is-entering .beat-body{animation:motion-body-in .62s .22s cubic-bezier(.16,1,.3,1) both}
+.beat.active.is-entering .scene-visual{animation:motion-visual-in .72s .28s cubic-bezier(.16,1,.3,1) both}
+.beat.active.is-entering .beat-steps .step.on:nth-child(1){animation:motion-step-in .52s .18s cubic-bezier(.16,1,.3,1) both}
+.beat.active.is-entering .beat-steps .step.on:nth-child(2){animation:motion-step-in .52s .28s cubic-bezier(.16,1,.3,1) both}
+.beat.active.is-entering .beat-steps .step.on:nth-child(3){animation:motion-step-in .52s .38s cubic-bezier(.16,1,.3,1) both}
+.beat.active.is-entering .beat-steps .step.on:nth-child(4){animation:motion-step-in .52s .48s cubic-bezier(.16,1,.3,1) both}
+.beat.motion-slam.active.is-entering .scene-copy{animation:motion-slam-in .78s cubic-bezier(.16,1,.3,1) both}
+.beat.motion-wipe.active.is-entering .scene-copy{animation:motion-wipe-in .8s cubic-bezier(.16,1,.3,1) both}
+.beat.motion-scan.active.is-entering .scene-visual{animation:motion-scan-in .8s cubic-bezier(.16,1,.3,1) both}
+.beat.motion-cascade.active.is-entering .scene-visual{animation:motion-cascade-in .78s cubic-bezier(.16,1,.3,1) both}
+.beat.motion-drift.active.is-entering .scene-copy{animation:motion-drift-in .8s cubic-bezier(.16,1,.3,1) both}
+.beat.motion-type-on.active.is-entering .scene-copy{animation:motion-type-in .78s cubic-bezier(.16,1,.3,1) both}
+.beat.motion-pulse.active.is-entering .scene-copy{animation:motion-pulse-in .82s cubic-bezier(.16,1,.3,1) both}
+@keyframes motion-glow-in{from{opacity:0;transform:scale(.68)}to{opacity:.72;transform:none}}
+@keyframes motion-line-in{from{opacity:0;transform:translateX(180px) rotate(-18deg)}to{opacity:.45;transform:rotate(-18deg)}}
+@keyframes motion-meta-in{from{opacity:0;transform:translateY(-18px)}to{opacity:1;transform:none}}
+@keyframes motion-title-in{from{opacity:0;filter:blur(12px);transform:translateY(62px) scale(.92)}to{opacity:1;filter:none;transform:none}}
+@keyframes motion-body-in{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+@keyframes motion-visual-in{from{opacity:0;transform:translateY(32px)}to{opacity:1;transform:none}}
+@keyframes motion-step-in{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+@keyframes motion-slam-in{from{opacity:0;transform:scale(.74) rotate(2deg)}to{opacity:1;transform:none}}
+@keyframes motion-wipe-in{from{opacity:0;clip-path:inset(0 100% 0 0)}to{opacity:1;clip-path:inset(0)}}
+@keyframes motion-scan-in{from{opacity:0;transform:translateX(90px)}to{opacity:1;transform:none}}
+@keyframes motion-cascade-in{from{opacity:0;transform:translateY(64px) skewY(3deg)}to{opacity:1;transform:none}}
+@keyframes motion-drift-in{from{opacity:0;transform:translateX(-80px)}to{opacity:1;transform:none}}
+@keyframes motion-type-in{from{opacity:0;transform:scaleX(.72);transform-origin:left center}to{opacity:1;transform:none}}
+@keyframes motion-pulse-in{from{opacity:0;transform:scale(1.14)}to{opacity:1;transform:none}}
+@media (max-width:1100px){.scene{padding:92px 88px 72px}.beat-title{font-size:82px}.beat-hook-slam .beat-title{font-size:106px}.beat-quote-cut .scene{padding-left:120px}.beat-quote-cut .beat-title{font-size:80px}.scene-number strong{font-size:190px}}
+@media (max-width:900px){.scene{padding:76px 56px 60px}.scene-meta{margin-bottom:26px}.beat-kicker{font-size:15px}.scene-counter,.scene-footer{font-size:11px}.beat-title,.beat-hook-slam .beat-title,.beat-diagonal-reveal .beat-title,.beat-quote-cut .beat-title,.beat-closing-lock .beat-title{font-size:58px}.beat-body{font-size:19px}.scene-visual{margin-top:28px}.step-text{font-size:18px}.scene-number strong{font-size:140px}.scene-split{grid-template-columns:1fr 22px 1fr}.scene-split>div{min-height:120px;padding:16px}.scene-split strong{font-size:20px}.scene-quote{font-size:31px}.beat-broll .beat-title{font-size:52px}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important;scroll-behavior:auto!important}.beat.active.is-entering .beat-title,.beat.active.is-entering .scene-copy,.beat.active.is-entering .scene-visual,.step{opacity:1!important;transform:none!important;filter:none!important;clip-path:none!important}}
+`;
+}
+
 /** 生成单文件 HTML（时间属性由已确认时间轴直接内联） */
 export function renderMotionHtml(timeline: MotionTimeline, jobId: string): string {
   const [c1, c2] = gradientPair(jobId);
   const pageStyle = timeline.page?.style || 'apple-tech-gradient';
   const beatsHtml = timeline.beats
-    .map((beat) =>
+    .map((beat, index) =>
       beatHtml({
         id: beat.id,
         kind: beat.kind,
@@ -454,6 +667,7 @@ export function renderMotionHtml(timeline: MotionTimeline, jobId: string): strin
         endMs: beat.endMs,
         stepTimes: beat.stepTimes,
         scene: timeline.page?.scenes.find((scene) => scene.beatId === beat.id),
+        index,
       }),
     )
     .join('\n');
@@ -549,7 +763,7 @@ body{overflow:hidden;background:var(--bg);color:var(--text);
 <meta charset="utf-8">
 <meta name="viewport" content="width=1920,initial-scale=1">
 <title>${esc(timeline.title)} · Motion</title>
-<style>${css}${richMotionCss()}</style>
+<style>${css}${richMotionCss()}${kineticMotionCss()}</style>
 </head>
 <body class="js style-${esc(pageStyle)}">
 <div id="stage">

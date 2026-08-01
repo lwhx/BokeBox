@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
-import type { MotionPageSpec, MotionScene, MotionTimeline } from '@bokebox/shared/motion';
+import type {
+  MotionPageSpec,
+  MotionScene,
+  MotionSceneMotion,
+  MotionSceneVariant,
+  MotionTimeline,
+} from '@bokebox/shared/motion';
 import {
   draftMotionTimeline,
   fetchMotionTimeline,
@@ -32,6 +38,53 @@ function timelineFromDraft(jobId: string, draft: Awaited<ReturnType<typeof draft
 function fmtMs(ms: number): string {
   const total = Math.max(0, Math.floor(ms / 1000));
   return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+}
+
+const SCENE_VARIANTS: MotionSceneVariant[] = [
+  'hook-slam',
+  'diagonal-reveal',
+  'signal-bars',
+  'before-after',
+  'stack-cascade',
+  'quote-cut',
+  'ticker-drive',
+  'closing-lock',
+];
+
+const SCENE_MOTIONS: MotionSceneMotion[] = [
+  'slam',
+  'wipe',
+  'scan',
+  'cascade',
+  'drift',
+  'type-on',
+  'pulse',
+];
+
+function sceneVariant(scene: MotionScene, index: number): MotionSceneVariant {
+  if (scene.variant && SCENE_VARIANTS.includes(scene.variant)) return scene.variant;
+  if (scene.layout === 'closing') return 'closing-lock';
+  if (index === 0) return 'hook-slam';
+  if (scene.visual === 'number-count') return 'signal-bars';
+  if (scene.visual === 'split-compare') return 'before-after';
+  if (scene.visual === 'path-build') return 'stack-cascade';
+  if (scene.visual === 'quote-lock') return 'quote-cut';
+  return SCENE_VARIANTS[(index - 1) % (SCENE_VARIANTS.length - 1)];
+}
+
+function sceneMotion(scene: MotionScene, variant: MotionSceneVariant, index: number): MotionSceneMotion {
+  if (scene.motion && SCENE_MOTIONS.includes(scene.motion)) return scene.motion;
+  const byVariant: Partial<Record<MotionSceneVariant, MotionSceneMotion>> = {
+    'hook-slam': 'slam',
+    'diagonal-reveal': 'wipe',
+    'signal-bars': 'scan',
+    'before-after': 'drift',
+    'stack-cascade': 'cascade',
+    'quote-cut': 'type-on',
+    'ticker-drive': 'pulse',
+    'closing-lock': 'slam',
+  };
+  return byVariant[variant] || SCENE_MOTIONS[index % SCENE_MOTIONS.length];
 }
 
 function fallbackScene(beat: MotionTimeline['beats'][number], index: number): MotionScene {
@@ -132,6 +185,8 @@ function MotionPreview({
   const beat = timeline.beats[activeIndex] || timeline.beats[0];
   const page: MotionPageSpec | undefined = timeline.page;
   const scene = resolveScene(page, beat, activeIndex);
+  const variant = sceneVariant(scene, activeIndex);
+  const motion = sceneMotion(scene, variant, activeIndex);
   const style = page?.style || 'editorial-magazine';
   const totalSec = durationSec > 0 ? durationSec : timeline.durationMs / 1000;
   const progress = totalSec > 0 ? Math.min(100, (currentSec / totalSec) * 100) : 0;
@@ -147,13 +202,25 @@ function MotionPreview({
 
   return (
     <div className={['qq-motion-preview', playing ? 'is-playing' : ''].join(' ')}>
-      <div className={['qq-motion-canvas', `motion-style-${style}`].join(' ')} style={{ '--motion-accent': scene.accent } as CSSProperties}>
+      <div
+        className={['qq-motion-canvas', `motion-style-${style}`, `motion-variant-${variant}`].join(' ')}
+        style={{ '--motion-accent': scene.accent, '--motion-accent-2': scene.accent2 || scene.accent } as CSSProperties}
+      >
         <div className="qq-motion-canvas-grid" aria-hidden />
         <div className="qq-motion-canvas-top">
           <span>{scene.eyebrow}</span>
           <span>{fmtMs(nowMs)} / {fmtMs(timeline.durationMs)}</span>
         </div>
-        <div className={['qq-motion-scene', `is-${visibleScene.layout}`, `is-${visibleScene.visual}`].join(' ')}>
+        <div
+          key={`${beat.id}-${variant}`}
+          className={[
+            'qq-motion-scene',
+            `is-${visibleScene.layout}`,
+            `is-${visibleScene.visual}`,
+            `is-variant-${variant}`,
+            `is-motion-${motion}`,
+          ].join(' ')}
+        >
           <div className="qq-motion-scene-index">{String(activeIndex + 1).padStart(2, '0')}</div>
           <div className="qq-motion-scene-copy">
             <h4>{visibleScene.title}</h4>
@@ -328,7 +395,19 @@ export function MotionPanel({
               </div>
               <div className="qq-motion-scene-actions">
                 <a href={motionSrtUrl(jobId)}>{t('motion.downloadSrt')}</a>
-                {timeline.page && <a href={motionTimelineUrl(jobId, true)} download>{t('motion.downloadHtml')}</a>}
+                {timeline.page && (
+                  <>
+                    <a
+                      className="is-primary"
+                      href={motionTimelineUrl(jobId)}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      {t('motion.openHtml')}
+                    </a>
+                    <a href={motionTimelineUrl(jobId, true)} download>{t('motion.downloadHtml')}</a>
+                  </>
+                )}
               </div>
             </div>
             <div className="qq-motion-scene-list">
@@ -337,7 +416,7 @@ export function MotionPanel({
                 return (
                   <button key={beat.id} type="button" onClick={() => onSeek(beat.startMs / 1000)} className={index === activeBeatIndex ? 'is-current' : ''}>
                     <span className="qq-motion-scene-list-time">{fmtMs(beat.startMs)}</span>
-                    <span className="qq-motion-scene-list-copy"><small>{scene.eyebrow} · {scene.primitive} · {scene.visual}</small><strong>{scene.title}</strong></span>
+                    <span className="qq-motion-scene-list-copy"><small>{scene.eyebrow} · {scene.variant || scene.visual} · {scene.motion || 'auto'}</small><strong>{scene.title}</strong></span>
                     <span className="qq-motion-scene-list-arrow">↗</span>
                   </button>
                 );

@@ -48,8 +48,8 @@ export interface MotionTimelineResponse {
 }
 
 export function motionTimelineUrl(jobId: string, download = false): string {
-  const base = `/jobs/${encodeURIComponent(jobId)}/motion`;
-  return download ? `${base}.html?download=1` : base;
+  const base = `/jobs/${encodeURIComponent(jobId)}/motion.html`;
+  return download ? `${base}?download=1` : base;
 }
 
 export function motionSrtUrl(jobId: string): string {

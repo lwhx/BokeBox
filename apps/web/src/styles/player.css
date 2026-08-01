@@ -3195,3 +3195,417 @@ html[data-theme="dark"] .qq-lyrics-return {
 .qq-motion-scrubber-labels {
   color: var(--motion-muted);
 }
+
+/* Motion v2 · wide recording workspace + scene-specific choreography */
+.qq-stage.is-motion {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+}
+.qq-stage.is-motion .qq-stage-left {
+  width: 100%;
+  padding-inline: 0;
+}
+.qq-stage.is-motion .qq-hero {
+  display: none;
+}
+.qq-stage.is-motion .qq-stage-right {
+  display: none;
+}
+.qq-motion {
+  padding: 10px 0 52px;
+  gap: 18px;
+}
+.qq-motion-header,
+.qq-motion-create,
+.qq-motion-preview-card,
+.qq-motion-scenes {
+  border-radius: 24px;
+  box-shadow: 0 18px 54px color-mix(in srgb, var(--shadow) 14%, transparent);
+}
+.qq-motion-header {
+  padding: 26px 30px;
+  background:
+    radial-gradient(circle at 88% 20%, color-mix(in srgb, var(--brand-2) 16%, transparent), transparent 32%),
+    color-mix(in srgb, var(--surface) 90%, transparent);
+}
+.qq-motion-create {
+  padding: 22px 26px 24px;
+}
+.qq-motion-create-copy {
+  margin-bottom: 18px;
+}
+.qq-motion-create-number {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #f97316, #ec4899 54%, #22d3ee);
+}
+.qq-motion-prompt-row {
+  align-items: stretch;
+}
+.qq-motion-prompt-row input {
+  height: 48px;
+  border-radius: 14px;
+}
+.qq-motion-prompt-row .qq-btn {
+  min-width: 136px;
+  border-radius: 14px;
+}
+.qq-motion-preview-card,
+.qq-motion-scenes {
+  padding: 22px 24px 24px;
+}
+.qq-motion-preview {
+  border-radius: 20px;
+  box-shadow: 0 20px 54px rgba(0, 0, 0, .22);
+}
+.qq-motion-canvas {
+  --motion-accent-2: #fbbf24;
+  --motion-ink: #f7f7fb;
+  --motion-muted: rgba(247, 247, 251, .62);
+  --motion-rule: rgba(255, 255, 255, .15);
+  isolation: isolate;
+  background:
+    radial-gradient(circle at 76% 25%, color-mix(in srgb, var(--motion-accent) 28%, transparent), transparent 30%),
+    linear-gradient(135deg, #080910 0%, #121426 52%, #06070b 100%);
+}
+.qq-motion-canvas::before {
+  content: '';
+  position: absolute;
+  inset: -30%;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(122deg, transparent 0 48%, color-mix(in srgb, var(--motion-accent) 15%, transparent) 48.2% 49%, transparent 49.2%),
+    radial-gradient(ellipse at 12% 78%, color-mix(in srgb, var(--motion-accent-2) 13%, transparent), transparent 32%);
+  transform: rotate(-4deg);
+}
+.qq-motion-canvas.motion-style-editorial-magazine,
+.qq-motion-canvas.motion-style-newspaper-evidence {
+  --motion-ink: #171717;
+  --motion-muted: #67635c;
+  --motion-rule: rgba(23, 23, 23, .18);
+  color: var(--motion-ink);
+  background: #f1ede5;
+}
+.qq-motion-canvas.motion-style-sketch-note {
+  --motion-ink: #25231f;
+  --motion-muted: #776f67;
+  --motion-rule: rgba(37, 35, 31, .22);
+  color: var(--motion-ink);
+  background-color: #f5f1e8;
+  background-image: linear-gradient(rgba(71, 115, 143, .09) 1px, transparent 1px), linear-gradient(90deg, rgba(71, 115, 143, .09) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+.qq-motion-canvas.motion-style-finance-studio-cards {
+  --motion-ink: #ecfeff;
+  --motion-muted: rgba(236, 254, 255, .58);
+  --motion-rule: rgba(45, 212, 191, .24);
+  color: var(--motion-ink);
+  background: linear-gradient(135deg, #091b1e, #061012 76%);
+}
+.qq-motion-canvas.motion-style-paper-collage {
+  --motion-ink: #211d1a;
+  --motion-muted: #6d6259;
+  --motion-rule: rgba(33, 29, 26, .2);
+  color: var(--motion-ink);
+  background: #f3ead9;
+}
+.qq-motion-canvas-grid {
+  z-index: 0;
+  opacity: .25;
+  background-size: 10% 20%;
+  mask-image: linear-gradient(120deg, #000 0%, transparent 78%);
+}
+.qq-motion-canvas-top,
+.qq-motion-canvas-footer {
+  z-index: 3;
+}
+.qq-motion-canvas-top span:first-child {
+  color: var(--motion-accent);
+}
+.qq-motion-canvas-footer {
+  border-top-color: color-mix(in srgb, var(--motion-accent) 28%, transparent);
+}
+.qq-motion-scene {
+  inset: 19% 7% 16%;
+  grid-template-columns: 9% minmax(0, 1fr);
+  gap: 2%;
+  animation: qq-motion-scene-in .72s cubic-bezier(.16, 1, .3, 1) both;
+}
+.qq-motion-scene-index {
+  color: var(--motion-accent);
+  font-size: clamp(30px, 6.8vw, 96px);
+  font-variant-numeric: tabular-nums;
+}
+.qq-motion-scene-copy {
+  max-width: 100%;
+}
+.qq-motion-scene-copy h4 {
+  max-width: 980px;
+  color: var(--motion-ink);
+  font-size: clamp(22px, 5.2vw, 78px);
+  line-height: 1.02;
+  letter-spacing: -.055em;
+  text-wrap: balance;
+}
+.qq-motion-scene-copy p {
+  max-width: 680px;
+  color: var(--motion-muted);
+  font-size: clamp(10px, 1.2vw, 17px);
+}
+.qq-motion-live-lockup,
+.qq-motion-live-quote,
+.qq-motion-live-number,
+.qq-motion-live-path,
+.qq-motion-live-split,
+.qq-motion-live-layers {
+  margin-top: 6%;
+}
+.qq-motion-live-lockup {
+  color: var(--motion-accent);
+}
+.qq-motion-live-lockup i {
+  width: 72px;
+  background: linear-gradient(90deg, var(--motion-accent), var(--motion-accent-2));
+}
+.qq-motion-live-number {
+  color: var(--motion-accent);
+}
+.qq-motion-live-number strong {
+  font-size: clamp(42px, 9vw, 130px);
+}
+.qq-motion-live-number span {
+  color: var(--motion-muted);
+}
+.qq-motion-live-path {
+  max-width: 900px;
+}
+.qq-motion-live-path-item {
+  padding: 12px 16px 0 0;
+  border-top: 2px solid color-mix(in srgb, var(--motion-accent) 72%, transparent);
+}
+.qq-motion-live-path-item > i {
+  background: var(--motion-accent-2);
+}
+.qq-motion-live-path-item strong,
+.qq-motion-live-split strong,
+.qq-motion-live-layers strong {
+  color: var(--motion-ink);
+}
+.qq-motion-live-split {
+  max-width: 860px;
+  border-top-color: var(--motion-rule);
+  border-bottom-color: var(--motion-rule);
+}
+.qq-motion-live-split > div.is-focus {
+  background: color-mix(in srgb, var(--motion-accent) 14%, transparent);
+}
+.qq-motion-live-split > i {
+  background: var(--motion-accent);
+}
+.qq-motion-live-layers {
+  max-width: 820px;
+}
+.qq-motion-live-layers div {
+  border-left-color: var(--motion-accent);
+  border-bottom-color: var(--motion-rule);
+  background: color-mix(in srgb, var(--motion-accent) 8%, transparent);
+}
+.qq-motion-live-quote {
+  max-width: 860px;
+  border-left-color: var(--motion-accent);
+  color: var(--motion-ink);
+  font-size: clamp(16px, 2.2vw, 31px);
+}
+/* Composition changes */
+.qq-motion-scene.is-variant-hook-slam {
+  inset: 18% 6% 14%;
+}
+.qq-motion-scene.is-variant-hook-slam .qq-motion-scene-copy h4 {
+  max-width: 1050px;
+  font-size: clamp(28px, 6.4vw, 94px);
+}
+.qq-motion-scene.is-variant-hook-slam .qq-motion-scene-copy::after {
+  content: '';
+  display: block;
+  width: 34%;
+  height: 3px;
+  margin-top: 7%;
+  background: linear-gradient(90deg, var(--motion-accent), var(--motion-accent-2), transparent);
+  transform: skewX(-28deg);
+  transform-origin: left;
+}
+.qq-motion-scene.is-variant-diagonal-reveal {
+  inset: 25% 8% 13%;
+  align-items: end;
+}
+.qq-motion-scene.is-variant-diagonal-reveal .qq-motion-scene-copy {
+  transform: rotate(-1.4deg);
+}
+.qq-motion-scene.is-variant-diagonal-reveal .qq-motion-scene-copy h4 {
+  max-width: 860px;
+}
+.qq-motion-scene.is-variant-signal-bars {
+  inset: 19% 6% 13%;
+}
+.qq-motion-scene.is-variant-signal-bars .qq-motion-scene-copy h4 {
+  max-width: 740px;
+}
+.qq-motion-scene.is-variant-signal-bars::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: 7%;
+  width: 42%;
+  height: 36%;
+  border-top: 1px solid color-mix(in srgb, var(--motion-accent) 56%, transparent);
+  border-right: 1px solid color-mix(in srgb, var(--motion-accent) 32%, transparent);
+  transform: skewY(-9deg);
+  opacity: .72;
+}
+.qq-motion-scene.is-variant-before-after .qq-motion-scene-copy h4 {
+  max-width: 920px;
+}
+.qq-motion-scene.is-variant-stack-cascade {
+  inset: 20% 6% 13%;
+}
+.qq-motion-scene.is-variant-stack-cascade .qq-motion-scene-copy h4 {
+  max-width: 820px;
+}
+.qq-motion-scene.is-variant-quote-cut {
+  inset: 19% 5% 14%;
+}
+.qq-motion-scene.is-variant-quote-cut .qq-motion-scene-copy {
+  padding-left: 4%;
+}
+.qq-motion-scene.is-variant-quote-cut .qq-motion-scene-copy h4 {
+  max-width: 900px;
+  font-family: Georgia, 'Songti SC', serif;
+  font-weight: 760;
+  letter-spacing: -.03em;
+}
+.qq-motion-scene.is-variant-ticker-drive .qq-motion-scene-copy::before {
+  content: '///';
+  display: block;
+  margin-bottom: 6%;
+  color: var(--motion-accent);
+  font: 800 clamp(12px, 1vw, 17px) var(--font-mono, ui-monospace);
+  letter-spacing: .24em;
+}
+.qq-motion-scene.is-variant-ticker-drive .qq-motion-scene-copy::after {
+  content: '';
+  display: block;
+  width: 100%;
+  height: 1px;
+  margin-top: 7%;
+  background: repeating-linear-gradient(90deg, var(--motion-accent) 0 22px, transparent 22px 34px);
+  animation: qq-motion-ticker-line 1.8s cubic-bezier(.16, 1, .3, 1) both;
+}
+.qq-motion-scene.is-variant-closing-lock {
+  inset: 22% 8% 14%;
+  grid-template-columns: 1fr;
+  text-align: center;
+}
+.qq-motion-scene.is-variant-closing-lock .qq-motion-scene-index {
+  position: absolute;
+  top: -19%;
+  right: 0;
+  opacity: .22;
+}
+.qq-motion-scene.is-variant-closing-lock .qq-motion-scene-copy h4 {
+  max-width: 920px;
+  margin-inline: auto;
+}
+.qq-motion-scene.is-motion-slam { animation-name: qq-motion-slam-in; }
+.qq-motion-scene.is-motion-wipe { animation-name: qq-motion-wipe-in; }
+.qq-motion-scene.is-motion-scan { animation-name: qq-motion-scan-in; }
+.qq-motion-scene.is-motion-cascade { animation-name: qq-motion-cascade-in; }
+.qq-motion-scene.is-motion-drift { animation-name: qq-motion-drift-in; }
+.qq-motion-scene.is-motion-type-on { animation-name: qq-motion-type-in; }
+.qq-motion-scene.is-motion-pulse { animation-name: qq-motion-pulse-in; }
+@keyframes qq-motion-scene-in {
+  from { opacity: 0; transform: translateY(26px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes qq-motion-slam-in {
+  from { opacity: 0; transform: scale(.78) rotate(2deg); filter: blur(8px); }
+  to { opacity: 1; transform: none; filter: none; }
+}
+@keyframes qq-motion-wipe-in {
+  from { opacity: 0; clip-path: inset(0 100% 0 0); }
+  to { opacity: 1; clip-path: inset(0); }
+}
+@keyframes qq-motion-scan-in {
+  from { opacity: 0; transform: translateX(72px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes qq-motion-cascade-in {
+  from { opacity: 0; transform: translateY(56px) skewY(3deg); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes qq-motion-drift-in {
+  from { opacity: 0; transform: translateX(-66px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes qq-motion-type-in {
+  from { opacity: 0; transform: scaleX(.76); transform-origin: left center; }
+  to { opacity: 1; transform: none; }
+}
+@keyframes qq-motion-pulse-in {
+  from { opacity: 0; transform: scale(1.12); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes qq-motion-ticker-line {
+  from { transform: translateX(-30%); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+.qq-motion-scene-actions a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid color-mix(in srgb, var(--brand-2) 30%, var(--separator));
+  border-radius: 999px;
+  transition: background .2s ease, border-color .2s ease, color .2s ease;
+}
+.qq-motion-scene-actions a:hover {
+  border-color: var(--brand-2);
+  background: color-mix(in srgb, var(--brand-2) 12%, transparent);
+}
+.qq-motion-scene-actions a.is-primary {
+  color: var(--text);
+  background: color-mix(in srgb, var(--brand-2) 15%, transparent);
+}
+.qq-motion-empty span {
+  width: 32px;
+  height: 32px;
+  border: 2px solid var(--brand-2);
+  border-radius: 9px;
+  transform: rotate(45deg);
+  font-size: 0;
+}
+@media (max-width: 640px) {
+  .qq-stage.is-motion .qq-stage-left { padding-inline: 0; }
+  .qq-motion { padding: 6px 0 38px; }
+  .qq-motion-header,
+  .qq-motion-create,
+  .qq-motion-preview-card,
+  .qq-motion-scenes { border-radius: 18px; padding-inline: 16px; }
+  .qq-motion-preview-card,
+  .qq-motion-scenes { padding-block: 16px; }
+  .qq-motion-canvas { min-height: 230px; }
+  .qq-motion-scene { inset: 20% 6% 13%; grid-template-columns: 12% minmax(0, 1fr); }
+  .qq-motion-scene.is-variant-closing-lock { grid-template-columns: 1fr; }
+  .qq-motion-scene-copy h4,
+  .qq-motion-scene.is-variant-hook-slam .qq-motion-scene-copy h4 { font-size: clamp(22px, 8vw, 42px); }
+  .qq-motion-scene.is-variant-quote-cut .qq-motion-scene-copy { padding-left: 0; }
+  .qq-motion-scene-actions { margin-top: 14px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .qq-motion-scene,
+  .qq-motion-scene.is-variant-ticker-drive .qq-motion-scene-copy::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

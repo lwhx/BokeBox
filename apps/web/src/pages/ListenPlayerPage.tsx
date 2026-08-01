@@ -457,7 +457,7 @@ export function ListenPlayerPage({ id, route: _route }: { id: string; route: Rou
         </a>
       </header>
 
-      <div className="qq-stage">
+      <div className={['qq-stage', panel === 'motion' ? 'is-motion' : ''].filter(Boolean).join(' ')}>
         <div className="qq-stage-left">
           <div className="qq-hero">
             <div className="qq-song-head">

@@ -303,6 +303,41 @@ describe('motion AI page layer', () => {
     assert.equal(validateMotionHtml(html, timeline).ok, true);
   });
 
+  it('renders independent compositions and replayable entrance motion per beat', () => {
+    const timeline = {
+      version: 1 as const,
+      jobId: 'job-motion-variants',
+      title: '构图测试',
+      durationMs: 12000,
+      source: 'srt' as const,
+      srtCueCount: 3,
+      optimizedCueCount: 3,
+      beats: [
+        { id: 'b1', kind: 'motion' as const, title: '先打爆点', startMs: 0, endMs: 4000, stepTimes: [2200], cueRange: [1, 1] as [number, number] },
+        { id: 'b2', kind: 'motion' as const, title: '再给证据', startMs: 4000, endMs: 8000, stepTimes: [], cueRange: [2, 2] as [number, number] },
+        { id: 'b3', kind: 'closing' as const, title: '最后锁帧', startMs: 8000, endMs: 12000, stepTimes: [], cueRange: [3, 3] as [number, number] },
+      ],
+      page: {
+        version: 1 as const,
+        source: 'ai' as const,
+        generatedAt: new Date().toISOString(),
+        style: 'apple-tech-gradient' as const,
+        scenes: [
+          { beatId: 'b1', layout: 'hero' as const, primitive: 'Claim' as const, visual: 'claim-lockup' as const, variant: 'hook-slam' as const, motion: 'slam' as const, eyebrow: 'HOOK', title: '先打爆点', body: '', bullets: [], accent: '#f97316', accent2: '#fbbf24' },
+          { beatId: 'b2', layout: 'split' as const, primitive: 'Evidence' as const, visual: 'number-count' as const, variant: 'signal-bars' as const, motion: 'scan' as const, eyebrow: 'EVIDENCE', title: '再给证据', body: '', bullets: ['一个数字'], accent: '#22d3ee', accent2: '#a78bfa' },
+          { beatId: 'b3', layout: 'closing' as const, primitive: 'Claim' as const, visual: 'quote-lock' as const, variant: 'closing-lock' as const, motion: 'slam' as const, eyebrow: 'CLOSE', title: '最后锁帧', body: '把结论留在画面里。', bullets: [], accent: '#fb7185', accent2: '#fbbf24' },
+        ],
+      },
+    };
+    const html = renderMotionHtml(timeline, 'job-motion-variants');
+    assert.match(html, /beat-hook-slam/);
+    assert.match(html, /beat-signal-bars/);
+    assert.match(html, /beat-closing-lock/);
+    assert.match(html, /motion-slam-in/);
+    assert.match(html, /replayBeat/);
+    assert.equal(validateMotionHtml(html, timeline).ok, true);
+  });
+
   it('escapes generated kicker text in the standalone HTML export', () => {
     const timeline = {
       version: 1 as const,

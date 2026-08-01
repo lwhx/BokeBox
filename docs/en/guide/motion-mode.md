@@ -1,16 +1,16 @@
 ---
-description: Motion mode — generate an AI-driven 16:9 page from the spoken script and preview it online against the SRT master clock.
+description: Motion mode — generate a recordable 16:9 multi-composition animation from the spoken script and sync it to the SRT master clock.
 ---
 
 # Motion Mode (Info Animation)
 
-Motion turns a finished podcast episode into a **16:9 online information sequence**. The script's actual length and natural paragraphs drive the chapter and animation count, while audio synthesis produces the measured SRT alongside the audio. AI designs one visual page per animation interval; SRT / `script-timing` advances the real narration clock.
+Motion turns a finished podcast episode into a **16:9 recordable information animation**. The script's actual length and natural paragraphs drive the chapter and animation count, while audio synthesis produces the measured SRT alongside the audio. AI composes an independent HTML layout and entrance rhythm for every animation interval; SRT / `script-timing` advances the real narration clock.
 
-The page is previewed directly inside the player. A single-file HTML download remains available as a secondary path for recording and offline sharing.
+The page is previewed directly inside the player, or opened as a new standalone page for full-screen recording. A single-file HTML download remains available for offline sharing.
 
 The design is adapted from [jacky-motion](https://github.com/Jackywxsz/Jacky-motion) (MIT), keeping its “SRT master clock + confirmation gate” core while reshaping the product flow for BokeBox.
 
-The page generator also follows Jacky-motion's method: lock one style and information primitive first, then use a stable layout skeleton. Each scene has one clear first-glance object instead of a dashboard made of equal cards. Six styles are available: `apple-tech-gradient`, `editorial-magazine`, `sketch-note`, `finance-studio-cards`, `newspaper-evidence`, and `paper-collage`.
+The page generator keeps Jacky-motion's SRT clock idea but no longer locks the episode into one layout skeleton. It locks a color base for the episode, then gives every beat its own composition and motion. Eight compositions are available: hook slam, diagonal reveal, signal bars, before/after, stack cascade, quote cut, ticker drive, and closing lock. Each scene has one clear first-glance object instead of a dashboard made of equal cards.
 
 ## Generate in the player
 
@@ -19,9 +19,9 @@ The page generator also follows Jacky-motion's method: lock one style and inform
 3. Review the prepared chapter cards; their count grows with the spoken script instead of being fixed or guessed from every subtitle cue.
 4. Add a visual direction, for example “restrained like an Apple keynote, with three clear takeaways”.
 5. Click **Generate page**. AI creates one visual page for every script-driven animation interval, so longer scripts produce more scenes.
-6. Play the audio. Chapter changes and in-chapter steps follow the SRT in real time. Download HTML only when recording or sharing offline.
+6. Play the audio. Chapter changes and in-chapter steps follow the SRT in real time. Open **Open recording page** for a standalone full-screen HTML page, or download it for offline sharing.
 
-Without an LLM key, Motion creates a deterministic base page so preview still works. With an LLM configured, the visual content comes from the AI page generator.
+Without an LLM key, Motion still creates a deterministic multi-composition page so preview and recording work. With an LLM configured, the visual content comes from the AI page generator.
 
 ## Workflow
 
@@ -31,8 +31,8 @@ Without an LLM key, Motion creates a deterministic base page so preview still wo
 | **S2 Audio + SRT** | TTS synthesizes sentence chunks and writes measured `script-timing.json` and `podcast.srt` using speech ranges and pauses; Motion now has both its structure and real clock |
 | **S3 Chapter timeline** | Map each chapter's opening sentence to a real SRT cue. Chapter windows absorb natural pauses, so page count does not grow with subtitle fragmentation |
 | **S3.5 P3.5 gate** | Check that the first chapter starts at 0ms, chapters do not overlap, the closing chapter reaches the master duration, step ms values are valid, and the final beat is `closing` |
-| **S4 AI page** | AI locks one style, layout skeleton, and information primitive for every script-driven animation interval; one primary page per interval |
-| **S5 Preview / export** | The React player switches between all generated pages in real time; `motion.html` remains available for recording |
+| **S4 AI page** | AI chooses an independent composition and entrance motion for every script-driven interval; the episode shares only a color base |
+| **S5 Preview / export** | The React player switches between all generated pages in real time; a standalone `motion.html` opens for full-screen recording and offline sharing |
 
 ## Generate from the player
 
@@ -48,7 +48,8 @@ The timeline is locked in `motion-timeline.json`; regenerating the AI page does 
 
 - Information primitives are Claim, Contrast, Path, System, and Evidence; each beat chooses one primary primitive.
 - Each chapter gets one primary visual page with only a few in-chapter reveals, and finishes on a screenshot-ready final frame.
-- The style is locked for the episode; AI does not randomly change the visual language between adjacent scenes.
+- The color base is locked for the episode, while composition and entrance motion are selected per beat; adjacent pages do not repeat the same composition.
+- Titles, supporting text, and visual marks stay inside recording-safe margins instead of collapsing into a card wall.
 
 ## HTML player
 
@@ -56,7 +57,7 @@ The timeline is locked in `motion-timeline.json`; regenerating the AI page does 
 - **Gate overlay**: ready → 3-2-1 countdown (leave room before recording)
 - **HUD**: beat dots + current millisecond clock
 - **Keyboard**: `Space` pause/resume · `←` `→` ±5s · `R` restart · `F` fullscreen
-- **Style**: one locked style per episode; product-launch black space, editorial magazine, sketch note, finance studio, evidence newspaper, and paper collage are available; pure CSS transitions + class toggles, zero external dependencies
+- **Style**: the color base can use product-launch black space, editorial magazine, sketch note, finance studio, evidence newspaper, or paper collage; each beat adds its own composition and entrance motion with pure CSS animation and class toggles, zero external dependencies
 
 ## API
 
@@ -67,7 +68,7 @@ The timeline is locked in `motion-timeline.json`; regenerating the AI page does 
 | POST | `/api/jobs/:id/motion/draft` | S1→S3.5 precheck; returns coverage table and violations (no persistence) |
 | POST | `/api/jobs/:id/motion/confirm` | Confirm timeline (422 when the gate fails) and assemble HTML |
 | POST | `/api/jobs/:id/motion/build` | Re-assemble from the confirmed timeline |
-| GET | `/api/jobs/:id/motion.html` | Download `motion.html` (`?download=1`) |
+| GET | `/api/jobs/:id/motion.html` | Open the standalone `motion.html`; add `?download=1` to download |
 | GET | `/api/jobs/:id/motion.srt` | Download the optimized SRT |
 
 Writes require a logged-in user; confirmed artifacts are downloadable by public-site visitors (same as audio).
