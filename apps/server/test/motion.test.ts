@@ -300,6 +300,8 @@ describe('motion AI page layer', () => {
     assert.match(html, /AI 页面标题/);
     assert.match(html, /根据口播稿生成的补充说明/);
     assert.match(html, /第一条视觉要点/);
+    assert.match(html, /id="motionAudio"/);
+    assert.match(html, /function audioSource\(\)/);
     assert.equal(validateMotionHtml(html, timeline).ok, true);
   });
 

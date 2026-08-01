@@ -10,6 +10,7 @@
  * GET  /jobs/:id/motion.srt       → 下载优化后的 SRT（毫秒级主时钟原料）
  */
 import type { FastifyInstance } from 'fastify';
+import fs from 'node:fs/promises';
 import { jobPaths } from '../../utils/paths.js';
 import { getJob, isPubliclyListenable } from '../../services/job/jobStore.js';
 import { getRequestUser } from '../auth.js';
@@ -189,9 +190,21 @@ export async function motionRoutes(app: FastifyInstance): Promise<void> {
       if (!requireUser(req) && !isPubliclyListenable(job)) {
         return reply.code(404).send({ error: t(getRequestLocale(req), 'job.notFound') });
       }
-      const file = jobPaths(job.id).motionHtml;
+      let file = jobPaths(job.id).motionHtml;
       if (!(await pathExists(file))) {
         return reply.code(404).send({ error: t(getRequestLocale(req), 'job.motionHtmlMissing') });
+      }
+      // 旧版本 HTML 没有音频节点；首次打开时按已确认时间轴补装，避免用户必须重新生成页面。
+      try {
+        const currentHtml = await fs.readFile(file, 'utf8');
+        if (!currentHtml.includes('id="motionAudio"')) {
+          const rebuilt = await buildFromConfirmed(job);
+          if (rebuilt.ok && rebuilt.html?.file) {
+            file = rebuilt.html.file;
+          }
+        }
+      } catch {
+        // 兼容旧任务：补装失败时仍返回已有 HTML，让原有预览行为保持可用。
       }
       const baseName = (job.podcast?.title || job.title || job.id).replace(/[\\/:*?"<>|]/g, '_');
       return sendMedia(req, reply, file, `${baseName}-motion.html`, req.query.download === '1');

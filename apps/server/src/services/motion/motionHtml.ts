@@ -9,7 +9,7 @@
  * - 页面切后台返回后按绝对时钟追上正确画面，不补播错过的动画。
  *
  * 本生成器不引入 GSAP 等外部依赖：step 切换 = class 切换 + CSS transition/
- * keyframes，无网络依赖，离线可打开可录屏。
+ * keyframes。独立页面由 BokeBox 服务时，通过同源媒体路由加载当前任务音频。
  */
 import {
   formatMotionClock,
@@ -55,6 +55,7 @@ function runtimeScript(): string {
   'use strict';
   var stage = document.getElementById('stage');
   var beats = Array.prototype.slice.call(document.querySelectorAll('.beat'));
+  var audio = document.getElementById('motionAudio');
   var state = { beat: -1, step: 1 };
 
   /* 主时钟唯一时间表：全部来自已确认时间轴 */
@@ -117,6 +118,61 @@ function runtimeScript(): string {
     return playback.running
       ? clampTime(playback.offsetMs + performance.now() - playback.startedAt)
       : clampTime(playback.offsetMs);
+  }
+
+  function audioSource() {
+    var path = window.location.pathname || '';
+    var source = path.replace(/\/motion\.html$/, '/audio');
+    if (source === path) {
+      var jobId = document.body && document.body.getAttribute('data-motion-job');
+      source = '/api/jobs/' + encodeURIComponent(jobId || '') + '/audio';
+    }
+    try {
+      var params = new URLSearchParams(window.location.search || '');
+      var token = params.get('access_token') || params.get('token');
+      if (token) source += (source.indexOf('?') >= 0 ? '&' : '?') + 'access_token=' + encodeURIComponent(token);
+    } catch (e) {
+      /* 旧浏览器没有 URLSearchParams 时，cookie 鉴权仍可工作。 */
+    }
+    return source;
+  }
+
+  function seekAudio(ms) {
+    if (!audio) return;
+    try {
+      audio.currentTime = clampTime(ms) / 1000;
+    } catch (e) {
+      /* 音频 metadata 尚未就绪时，下一次播放会再次校准。 */
+    }
+  }
+
+  function ensureAudioSource() {
+    if (!audio) return false;
+    if (!audio.getAttribute('src')) audio.setAttribute('src', audioSource());
+    return Boolean(audio.getAttribute('src'));
+  }
+
+  function primeAudio() {
+    if (!ensureAudioSource()) return;
+    audio.muted = true;
+    seekAudio(0);
+    var promise = audio.play();
+    if (promise && promise.catch) promise.catch(function () {});
+  }
+
+  function startAudio(ms) {
+    if (!ensureAudioSource()) return;
+    audio.muted = false;
+    seekAudio(ms);
+    var promise = audio.play();
+    if (promise && promise.catch) promise.catch(function () {});
+  }
+
+  function pauseAudio(reset) {
+    if (!audio) return;
+    audio.pause();
+    audio.muted = false;
+    if (reset) seekAudio(0);
   }
 
   /* 静止帧：先落最终态，再决定是否播动画 */
@@ -187,6 +243,7 @@ function runtimeScript(): string {
     if (lastFrame) {
       settle(item.beat, stepsOf(item.beat));
       playback.running = false;
+      pauseAudio(false);
       document.body.classList.remove('autoplay-running');
     }
     updateHudTime(t);
@@ -212,6 +269,7 @@ function runtimeScript(): string {
     playback.startedAt = performance.now();
     if (gate) gate.hidden = true;
     document.body.classList.add('autoplay-running');
+    startAudio(playback.offsetMs);
     if (firstRun) {
       var startItem = schedule[0];
       for (var i = 0; i < schedule.length; i++) {
@@ -229,6 +287,7 @@ function runtimeScript(): string {
     playback.offsetMs = currentAutoplayTime();
     playback.running = false;
     cancelAnimationFrame(playback.frame);
+    pauseAudio(false);
     document.body.classList.remove('autoplay-running');
     renderAt(playback.offsetMs, false);
   }
@@ -246,6 +305,7 @@ function runtimeScript(): string {
     if (wasRunning) playback.offsetMs = currentAutoplayTime();
     playback.offsetMs = clampTime(playback.offsetMs + deltaMs);
     playback.startedAt = performance.now();
+    if (wasRunning) startAudio(playback.offsetMs);
     renderAt(playback.offsetMs, false);
   }
 
@@ -256,6 +316,8 @@ function runtimeScript(): string {
     var token = ++playback.countdownToken;
     playback.started = false;
     playback.offsetMs = 0;
+    pauseAudio(true);
+    primeAudio();
     renderAt(0, false);
     if (gate) gate.hidden = false;
     if (countdownEl) countdownEl.hidden = false;
@@ -681,6 +743,7 @@ export function renderMotionHtml(timeline: MotionTimeline, jobId: string): strin
 html,body{height:100%}
 body{overflow:hidden;background:var(--bg);color:var(--text);
   font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif}
+#motionAudio{display:none}
 #stage{width:1920px;height:1080px;position:fixed;left:50%;top:50%;
   overflow:hidden;background:
   radial-gradient(1200px 700px at 20% 0%, rgba(99,102,241,.16), transparent 60%),
@@ -765,7 +828,7 @@ body{overflow:hidden;background:var(--bg);color:var(--text);
 <title>${esc(timeline.title)} · Motion</title>
 <style>${css}${richMotionCss()}${kineticMotionCss()}</style>
 </head>
-<body class="js style-${esc(pageStyle)}">
+<body class="js style-${esc(pageStyle)}" data-motion-job="${esc(jobId)}">
 <div id="stage">
 ${beatsHtml}
 <div class="hud">
@@ -773,6 +836,7 @@ ${beatsHtml}
   <span id="hudTime">00:00.000 / ${formatMotionClock(durationMs)}</span>
 </div>
 </div>
+<audio id="motionAudio" preload="auto" aria-hidden="true"></audio>
 <div class="autoplay-gate" id="autoplayGate">
   <div class="autoplay-panel">
     <div class="autoplay-kicker">MOTION · ${esc(timeline.title)}</div>

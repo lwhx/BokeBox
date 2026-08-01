@@ -6,7 +6,7 @@ description: Motion mode — generate a recordable 16:9 multi-composition animat
 
 Motion turns a finished podcast episode into a **16:9 recordable information animation**. The script's actual length and natural paragraphs drive the chapter and animation count, while audio synthesis produces the measured SRT alongside the audio. AI composes an independent HTML layout and entrance rhythm for every animation interval; SRT / `script-timing` advances the real narration clock.
 
-The page is previewed directly inside the player, or opened as a new standalone page for full-screen recording. A single-file HTML download remains available for offline sharing.
+The page is previewed directly inside the player, or opened as a new standalone page that loads the job audio for full-screen recording; visuals and audio share the SRT master clock. A single-file HTML download remains available for offline visual sharing.
 
 The design is adapted from [jacky-motion](https://github.com/Jackywxsz/Jacky-motion) (MIT), keeping its “SRT master clock + confirmation gate” core while reshaping the product flow for BokeBox.
 
@@ -32,7 +32,7 @@ Without an LLM key, Motion still creates a deterministic multi-composition page 
 | **S3 Chapter timeline** | Map each chapter's opening sentence to a real SRT cue. Chapter windows absorb natural pauses, so page count does not grow with subtitle fragmentation |
 | **S3.5 P3.5 gate** | Check that the first chapter starts at 0ms, chapters do not overlap, the closing chapter reaches the master duration, step ms values are valid, and the final beat is `closing` |
 | **S4 AI page** | AI chooses an independent composition and entrance motion for every script-driven interval; the episode shares only a color base |
-| **S5 Preview / export** | The React player switches between all generated pages in real time; a standalone `motion.html` opens for full-screen recording and offline sharing |
+| **S5 Preview / export** | The React player switches between all generated pages in real time; a standalone `motion.html` opens with the job audio for full-screen recording, while the HTML download remains an offline visual artifact |
 
 ## Generate from the player
 
@@ -55,6 +55,7 @@ The timeline is locked in `motion-timeline.json`; regenerating the AI page does 
 
 - **Master clock**: `performance.now()` + `requestAnimationFrame`, no setTimeout chains; catches up by absolute time after a background tab
 - **Gate overlay**: ready → 3-2-1 countdown (leave room before recording)
+- **Audio**: the standalone page loads the current job audio, starts it with the recording gate, and re-aligns it on pause, seek, and replay
 - **HUD**: beat dots + current millisecond clock
 - **Keyboard**: `Space` pause/resume · `←` `→` ±5s · `R` restart · `F` fullscreen
 - **Style**: the color base can use product-launch black space, editorial magazine, sketch note, finance studio, evidence newspaper, or paper collage; each beat adds its own composition and entrance motion with pure CSS animation and class toggles, zero external dependencies
