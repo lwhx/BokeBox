@@ -3,12 +3,18 @@ import type {
   MotionBeat,
   MotionPageSpec,
   MotionPageStyle,
+  MotionPalette,
   MotionPrimitive,
   MotionScene,
   MotionSceneMotion,
   MotionSceneLayout,
   MotionSceneVariant,
+  MotionStyleOptions,
   MotionVisual,
+} from '@bokebox/shared';
+import {
+  DEFAULT_MOTION_STYLE_OPTIONS as DEFAULT_STYLE_OPTIONS,
+  normalizeMotionStyleOptions,
 } from '@bokebox/shared';
 import { aiFetch, getChatModel, hasApiKey } from '../../utils/aiConfig.js';
 
@@ -35,6 +41,13 @@ const STYLE_ACCENT_PAIRS: Record<MotionPageStyle, [string, string]> = {
   'finance-studio-cards': ['#2dd4bf', '#38bdf8'],
   'newspaper-evidence': ['#b91c1c', '#0f766e'],
   'paper-collage': ['#e85d36', '#7c3aed'],
+};
+const PALETTE_ACCENT_PAIRS: Record<Exclude<MotionPalette, 'auto'>, [string, string]> = {
+  warm: ['#f97316', '#facc15'],
+  cool: ['#22d3ee', '#6366f1'],
+  neon: ['#f43f5e', '#a855f7'],
+  monochrome: ['#f4f4f5', '#71717a'],
+  paper: ['#b45309', '#0f766e'],
 };
 const LAYOUTS: MotionSceneLayout[] = ['hero', 'split', 'steps', 'quote', 'closing'];
 const PRIMITIVES: MotionPrimitive[] = ['Claim', 'Contrast', 'Path', 'System', 'Evidence'];
@@ -78,6 +91,16 @@ function inferStyle(prompt: string | undefined, jobText: string): MotionPageStyl
 
 function clean(value: unknown, max: number): string {
   return String(value ?? '').replace(/\s+/gu, ' ').trim().slice(0, max);
+}
+
+function resolvedStyleOptions(value?: MotionStyleOptions): MotionStyleOptions {
+  return normalizeMotionStyleOptions(value) || { ...DEFAULT_STYLE_OPTIONS };
+}
+
+function accentPairFor(style: MotionPageStyle, palette: MotionPalette): [string, string] {
+  return palette === 'auto'
+    ? STYLE_ACCENT_PAIRS[style]
+    : PALETTE_ACCENT_PAIRS[palette];
 }
 
 function fallbackVariant(beat: MotionBeat, index: number): MotionSceneVariant {
@@ -146,7 +169,12 @@ function parseJson(text: string): Record<string, unknown> | null {
   }
 }
 
-function fallbackScene(beat: MotionBeat, index: number, style: MotionPageStyle): MotionScene {
+function fallbackScene(
+  beat: MotionBeat,
+  index: number,
+  style: MotionPageStyle,
+  styleOptions: MotionStyleOptions,
+): MotionScene {
   const bullets = beat.kind === 'broll'
     ? []
     : (beat.stepLabels?.length ? beat.stepLabels : [beat.title]).slice(0, 4);
@@ -176,7 +204,7 @@ function fallbackScene(beat: MotionBeat, index: number, style: MotionPageStyle):
           ? 'split-compare'
           : 'claim-lockup';
   const variant = fallbackVariant(beat, index);
-  const [accent, accent2] = STYLE_ACCENT_PAIRS[style];
+  const [accent, accent2] = accentPairFor(style, styleOptions.palette);
   return {
     beatId: beat.id,
     layout,
@@ -193,16 +221,25 @@ function fallbackScene(beat: MotionBeat, index: number, style: MotionPageStyle):
   };
 }
 
-function fallbackPage(beats: MotionBeat[], prompt: string | undefined, jobText: string): MotionPageSpec {
-  const style = inferStyle(prompt, jobText);
+function fallbackPage(
+  beats: MotionBeat[],
+  prompt: string | undefined,
+  jobText: string,
+  styleOptions?: MotionStyleOptions,
+): MotionPageSpec {
+  const options = resolvedStyleOptions(styleOptions);
+  const style = options.preset === 'auto' ? inferStyle(prompt, jobText) : options.preset;
   return {
     version: 1,
     source: 'fallback',
     style,
-    styleReason: '根据内容关键词选择色彩基底，再为每个 beat 生成不同构图与入场节奏。',
+    styleOptions: options,
+    styleReason: options.preset === 'auto'
+      ? '根据内容关键词选择色彩基底，再为每个 beat 生成不同构图与入场节奏。'
+      : '按结构化风格选项锁定视觉基底，再为每个 beat 生成不同构图与入场节奏。',
     prompt: prompt?.trim() || undefined,
     generatedAt: new Date().toISOString(),
-    scenes: beats.map((beat, index) => fallbackScene(beat, index, style)),
+    scenes: beats.map((beat, index) => fallbackScene(beat, index, style, options)),
   };
 }
 
@@ -211,9 +248,13 @@ function normalizePage(
   beats: MotionBeat[],
   prompt?: string,
   fallbackStyle: MotionPageStyle = 'apple-tech-gradient',
+  styleOptions?: MotionStyleOptions,
 ): MotionPageSpec | null {
+  const options = resolvedStyleOptions(styleOptions);
   const values = Array.isArray(raw.scenes) ? raw.scenes : [];
-  const style = STYLE_IDS.includes(raw.style as MotionPageStyle)
+  const style = options.preset !== 'auto'
+    ? options.preset
+    : STYLE_IDS.includes(raw.style as MotionPageStyle)
     ? raw.style as MotionPageStyle
     : fallbackStyle;
   const byId = new Map(
@@ -224,7 +265,7 @@ function normalizePage(
   let previousVariant: MotionSceneVariant | undefined;
   const scenes = beats.map((beat, index) => {
     const item = byId.get(beat.id) || values[index];
-    const fallback = fallbackScene(beat, index, style);
+    const fallback = fallbackScene(beat, index, style, options);
     if (!item || typeof item !== 'object') {
       previousVariant = fallback.variant;
       return fallback;
@@ -258,10 +299,10 @@ function normalizePage(
       title: clean(value.title, 72) || fallback.title,
       body: clean(value.body, 180),
       bullets,
-      accent: /^#[0-9a-f]{6}$/i.test(String(value.accent || ''))
+      accent: options.palette === 'auto' && /^#[0-9a-f]{6}$/i.test(String(value.accent || ''))
         ? String(value.accent)
         : fallback.accent,
-      accent2: /^#[0-9a-f]{6}$/i.test(String(value.accent2 || ''))
+      accent2: options.palette === 'auto' && /^#[0-9a-f]{6}$/i.test(String(value.accent2 || ''))
         ? String(value.accent2)
         : fallback.accent2,
     };
@@ -270,6 +311,7 @@ function normalizePage(
     version: 1,
     source: 'ai',
     style,
+    styleOptions: options,
     styleReason: clean(raw.styleReason, 120) || undefined,
     prompt: prompt?.trim() || undefined,
     generatedAt: new Date().toISOString(),
@@ -285,10 +327,12 @@ export async function generateMotionPage(
   job: Job,
   beats: MotionBeat[],
   prompt?: string,
+  styleOptions?: MotionStyleOptions,
 ): Promise<MotionPageSpec> {
   const jobText = `${job.podcast?.title || job.title} ${(job.podcast?.tags || []).join(' ')}`;
-  const fallbackStyle = inferStyle(prompt, jobText);
-  if (!hasApiKey('llm')) return fallbackPage(beats, prompt, jobText);
+  const options = resolvedStyleOptions(styleOptions);
+  const fallbackStyle = options.preset === 'auto' ? inferStyle(prompt, jobText) : options.preset;
+  if (!hasApiKey('llm')) return fallbackPage(beats, prompt, jobText, options);
 
   const outline = (job.podcast?.outline || [])
     .map((item, index) => `${index + 1}. ${item.title}：${item.summary}`)
@@ -314,10 +358,12 @@ export async function generateMotionPage(
     '页面要像真正的信息动画，不要像表格或 PPT：开头 1 秒先给爆点，标题巨大且可读，视觉只服务一个观点，底部和左右保留安全区。',
     'layout 只能是 hero、split、steps、quote、closing；bullets 最多 4 条；每条短于 24 个汉字。',
     'body 是补充解释，最多 80 个汉字；eyebrow 最多 12 个汉字；accent 和 accent2 必须是 #RRGGBB。',
+    `结构化选项必须服从：${JSON.stringify(options)}。preset 不是 auto 时，顶层 style 必须使用指定值；其余选项会由渲染器强制落实到配色、排版、信息密度和动效节奏。`,
   ].join('\n');
   const user = [
     `标题：${job.podcast?.title || job.title}`,
     `额外视觉要求：${prompt?.trim() || '默认做成适合 B 站录屏的高对比知识信息动画，前 1 秒给出视觉爆点，镜头之间明显换构图。'}`,
+    `结构化风格选项：${JSON.stringify(options)}`,
     `节目大纲：\n${outline || '无'}`,
     `口播稿：\n${(job.podcast?.script || '').slice(0, 14000)}`,
     `固定时间轴分镜：\n${JSON.stringify(beatBrief)}`,
@@ -353,7 +399,7 @@ export async function generateMotionPage(
   }
   const data = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
   const content = data.choices?.[0]?.message?.content || '';
-  const page = normalizePage(parseJson(content) || {}, beats, prompt, fallbackStyle);
+  const page = normalizePage(parseJson(content) || {}, beats, prompt, fallbackStyle, options);
   if (!page) throw new Error('Motion AI 返回的页面结构无法解析');
   return page;
 }

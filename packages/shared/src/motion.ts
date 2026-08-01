@@ -341,6 +341,85 @@ export type MotionPageStyle =
   | 'finance-studio-cards'
   | 'newspaper-evidence'
   | 'paper-collage';
+
+export type MotionStylePreset = 'auto' | MotionPageStyle;
+export type MotionPalette = 'auto' | 'warm' | 'cool' | 'neon' | 'monochrome' | 'paper';
+export type MotionTypography = 'auto' | 'display' | 'editorial' | 'mono' | 'handwritten';
+export type MotionDensity = 'airy' | 'balanced' | 'dense';
+export type MotionIntensity = 'calm' | 'dynamic' | 'explosive';
+
+/**
+ * 用户可控制的结构化视觉选项。
+ *
+ * 这些字段不是“装饰参数”：会同时约束页面生成提示词、fallback 页面、
+ * 场景强调色和最终 HTML 的排版 / 信息密度 / 入场节奏。
+ */
+export interface MotionStyleOptions {
+  preset: MotionStylePreset;
+  palette: MotionPalette;
+  typography: MotionTypography;
+  density: MotionDensity;
+  intensity: MotionIntensity;
+}
+
+export const DEFAULT_MOTION_STYLE_OPTIONS: MotionStyleOptions = {
+  preset: 'auto',
+  palette: 'auto',
+  typography: 'auto',
+  density: 'balanced',
+  intensity: 'dynamic',
+};
+
+const MOTION_STYLE_PRESETS: readonly MotionStylePreset[] = [
+  'auto',
+  'apple-tech-gradient',
+  'editorial-magazine',
+  'sketch-note',
+  'finance-studio-cards',
+  'newspaper-evidence',
+  'paper-collage',
+];
+const MOTION_PALETTES: readonly MotionPalette[] = [
+  'auto',
+  'warm',
+  'cool',
+  'neon',
+  'monochrome',
+  'paper',
+];
+const MOTION_TYPOGRAPHIES: readonly MotionTypography[] = [
+  'auto',
+  'display',
+  'editorial',
+  'mono',
+  'handwritten',
+];
+const MOTION_DENSITIES: readonly MotionDensity[] = ['airy', 'balanced', 'dense'];
+const MOTION_INTENSITIES: readonly MotionIntensity[] = ['calm', 'dynamic', 'explosive'];
+
+function readMotionEnum<T extends string>(value: unknown, values: readonly T[]): T | undefined {
+  return typeof value === 'string' && values.includes(value as T) ? value as T : undefined;
+}
+
+/** 将 API / 旧任务里的未知结构收敛成安全的完整选项。 */
+export function normalizeMotionStyleOptions(value: unknown): MotionStyleOptions | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const raw = value as Record<string, unknown>;
+  const preset = readMotionEnum(raw.preset, MOTION_STYLE_PRESETS);
+  const palette = readMotionEnum(raw.palette, MOTION_PALETTES);
+  const typography = readMotionEnum(raw.typography, MOTION_TYPOGRAPHIES);
+  const density = readMotionEnum(raw.density, MOTION_DENSITIES);
+  const intensity = readMotionEnum(raw.intensity, MOTION_INTENSITIES);
+  if (!preset && !palette && !typography && !density && !intensity) return undefined;
+  return {
+    preset: preset || DEFAULT_MOTION_STYLE_OPTIONS.preset,
+    palette: palette || DEFAULT_MOTION_STYLE_OPTIONS.palette,
+    typography: typography || DEFAULT_MOTION_STYLE_OPTIONS.typography,
+    density: density || DEFAULT_MOTION_STYLE_OPTIONS.density,
+    intensity: intensity || DEFAULT_MOTION_STYLE_OPTIONS.intensity,
+  };
+}
+
 export type MotionPrimitive = 'Claim' | 'Contrast' | 'Path' | 'System' | 'Evidence';
 export type MotionVisual =
   | 'claim-lockup'
@@ -397,6 +476,7 @@ export interface MotionPageSpec {
   version: 1;
   source: 'ai' | 'fallback';
   style: MotionPageStyle;
+  styleOptions?: MotionStyleOptions;
   styleReason?: string;
   prompt?: string;
   generatedAt: string;

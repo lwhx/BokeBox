@@ -157,7 +157,7 @@ Create, listen, and manage assets in one private space.
 ### Assets & listening
 - Job detail: transcript, script, notes, flashcards, cover, audio
 - Player: progress memory, speed, sleep timer (incl. end of episode)
-- **Motion mode**: derive the chapter and animation count from the spoken script, write SRT during audio synthesis, then create a 16:9 information animation with a distinct composition and entrance motion per shot; open a standalone page for full-screen recording (see [docs/guide/motion-mode.md](./docs/guide/motion-mode.md))
+- **Motion mode**: derive the chapter and animation count from the spoken script, write SRT during audio synthesis, then create a 16:9 information animation with a distinct composition and entrance motion per shot; customize the base, palette, type, information density, and motion intensity, then open a standalone page for full-screen recording (see [docs/guide/motion-mode.md](./docs/guide/motion-mode.md))
 - Albums for continuous play; topic graph by tags
 
 ### Settings center

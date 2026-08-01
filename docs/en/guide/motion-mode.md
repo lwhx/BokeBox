@@ -23,6 +23,18 @@ The page generator keeps Jacky-motion's SRT clock idea but no longer locks the e
 
 Without an LLM key, Motion still creates a deterministic multi-composition page so preview and recording work. With an LLM configured, the visual content comes from the AI page generator.
 
+## Structured style controls
+
+Before generating, choose five structured options below the visual prompt. They are not decorative labels: the selections are sent to the server, stored in the page spec, and applied by both the player preview and the standalone `motion.html`.
+
+- **Visual base**: auto, product launch, editorial magazine, sketch note, finance studio, evidence newspaper, or paper collage.
+- **Palette**: auto, warm orange/gold, cool blue/cyan, neon contrast, monochrome, or paper ink. A fixed palette replaces scene accent colors.
+- **Title type**: auto, modern display, editorial serif, data mono, or handwritten notes.
+- **Information density**: airy, balanced, or high information. This changes safe margins, title scale, and step spacing.
+- **Motion intensity**: calm, dynamic, or explosive. This changes entrance rhythm and title impact.
+
+Start with “auto + balanced + dynamic”, then change one option at a time and regenerate to compare. The SRT master clock, beat order, and time ranges remain unchanged.
+
 ## Workflow
 
 | Stage | What happens |
@@ -31,7 +43,7 @@ Without an LLM key, Motion still creates a deterministic multi-composition page 
 | **S2 Audio + SRT** | TTS synthesizes sentence chunks and writes measured `script-timing.json` and `podcast.srt` using speech ranges and pauses; Motion now has both its structure and real clock |
 | **S3 Chapter timeline** | Map each chapter's opening sentence to a real SRT cue. Chapter windows absorb natural pauses, so page count does not grow with subtitle fragmentation |
 | **S3.5 P3.5 gate** | Check that the first chapter starts at 0ms, chapters do not overlap, the closing chapter reaches the master duration, step ms values are valid, and the final beat is `closing` |
-| **S4 AI page** | AI chooses an independent composition and entrance motion for every script-driven interval; the episode shares only a color base |
+| **S4 AI page** | AI chooses an independent composition and entrance motion for every script-driven interval; structured options constrain the base, palette, type, density, and motion intensity |
 | **S5 Preview / export** | The React player switches between all generated pages in real time; a standalone `motion.html` opens with the job audio for full-screen recording, while the HTML download remains an offline visual artifact |
 
 ## Generate from the player
@@ -58,14 +70,14 @@ The timeline is locked in `motion-timeline.json`; regenerating the AI page does 
 - **Audio**: the standalone page first tries to autoplay the job audio; when the browser blocks it, the visual preview still runs and a bottom button enables sound after a user click; pause, seek, and replay re-align the audio
 - **HUD**: beat dots + current millisecond clock
 - **Keyboard**: `Space` pause/resume · `←` `→` ±5s · `R` restart · `F` fullscreen
-- **Style**: the color base can use product-launch black space, editorial magazine, sketch note, finance studio, evidence newspaper, or paper collage; each beat adds its own composition and entrance motion with pure CSS animation and class toggles, zero external dependencies
+- **Style**: the color base can use product-launch black space, editorial magazine, sketch note, finance studio, evidence newspaper, or paper collage; generation can also constrain palette, type, information density, and motion intensity; each beat adds its own composition and entrance motion with pure CSS animation and class toggles, zero external dependencies
 
 ## API
 
 | Method | Path | Description |
 | --- | --- | --- |
 | GET | `/api/jobs/:id/motion/timeline` | Confirmed timeline & coverage (empty when none) |
-| POST | `/api/jobs/:id/motion/generate` | Generate and save a page from the spoken script |
+| POST | `/api/jobs/:id/motion/generate` | Generate and save a page from the spoken script and optional `styleOptions` |
 | POST | `/api/jobs/:id/motion/draft` | S1→S3.5 precheck; returns coverage table and violations (no persistence) |
 | POST | `/api/jobs/:id/motion/confirm` | Confirm timeline (422 when the gate fails) and assemble HTML |
 | POST | `/api/jobs/:id/motion/build` | Re-assemble from the confirmed timeline |
@@ -73,6 +85,21 @@ The timeline is locked in `motion-timeline.json`; regenerating the AI page does 
 | GET | `/api/jobs/:id/motion.srt` | Download the optimized SRT |
 
 Writes require a logged-in user; confirmed artifacts are downloadable by public-site visitors (same as audio).
+
+Example request body:
+
+```json
+{
+  "prompt": "Hit a hook in the first second for Bilibili recording",
+  "styleOptions": {
+    "preset": "editorial-magazine",
+    "palette": "neon",
+    "typography": "editorial",
+    "density": "airy",
+    "intensity": "explosive"
+  }
+}
+```
 
 ## Artifacts
 

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { DEFAULT_MOTION_STYLE_OPTIONS, type MotionStyleOptions } from '@bokebox/shared/motion';
 import type {
   MotionPageSpec,
   MotionScene,
@@ -60,6 +61,8 @@ const SCENE_MOTIONS: MotionSceneMotion[] = [
   'type-on',
   'pulse',
 ];
+
+const DEFAULT_STYLE_OPTIONS: MotionStyleOptions = { ...DEFAULT_MOTION_STYLE_OPTIONS };
 
 function sceneVariant(scene: MotionScene, index: number): MotionSceneVariant {
   if (scene.variant && SCENE_VARIANTS.includes(scene.variant)) return scene.variant;
@@ -188,6 +191,9 @@ function MotionPreview({
   const variant = sceneVariant(scene, activeIndex);
   const motion = sceneMotion(scene, variant, activeIndex);
   const style = page?.style || 'editorial-magazine';
+  const typography = page?.styleOptions?.typography || 'auto';
+  const density = page?.styleOptions?.density || 'balanced';
+  const intensity = page?.styleOptions?.intensity || 'dynamic';
   const totalSec = durationSec > 0 ? durationSec : timeline.durationMs / 1000;
   const progress = totalSec > 0 ? Math.min(100, (currentSec / totalSec) * 100) : 0;
   const activeStep = beat
@@ -203,7 +209,14 @@ function MotionPreview({
   return (
     <div className={['qq-motion-preview', playing ? 'is-playing' : ''].join(' ')}>
       <div
-        className={['qq-motion-canvas', `motion-style-${style}`, `motion-variant-${variant}`].join(' ')}
+        className={[
+          'qq-motion-canvas',
+          `motion-style-${style}`,
+          `motion-variant-${variant}`,
+          `motion-typography-${typography}`,
+          `motion-density-${density}`,
+          `motion-intensity-${intensity}`,
+        ].join(' ')}
         style={{ '--motion-accent': scene.accent, '--motion-accent-2': scene.accent2 || scene.accent } as CSSProperties}
       >
         <div className="qq-motion-canvas-grid" aria-hidden />
@@ -273,12 +286,16 @@ export function MotionPanel({
   const { t } = useI18n();
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' });
   const [prompt, setPrompt] = useState('');
+  const [styleOptions, setStyleOptions] = useState<MotionStyleOptions>(DEFAULT_STYLE_OPTIONS);
   const [busy, setBusy] = useState(false);
   const loggedIn = Boolean(getToken());
 
   const load = useCallback(async () => {
     const result = await fetchMotionTimeline(jobId);
-    if (result.hasTimeline && result.timeline) setPhase({ kind: 'ready', timeline: result.timeline });
+    if (result.hasTimeline && result.timeline) {
+      setPhase({ kind: 'ready', timeline: result.timeline });
+      if (result.timeline.page?.styleOptions) setStyleOptions(result.timeline.page.styleOptions);
+    }
     else if (loggedIn) {
       const draft = await draftMotionTimeline(jobId);
       if (draft.ok && draft.gate?.pass && draft.beats.length) {
@@ -297,9 +314,10 @@ export function MotionPanel({
     setBusy(true);
     setPhase({ kind: 'generating' });
     try {
-      const result = await generateMotionPage(jobId, prompt);
+      const result = await generateMotionPage(jobId, prompt, styleOptions);
       if (!result.ok || !result.timeline) throw new Error(result.message || result.error || t('motion.error'));
       setPhase({ kind: 'ready', timeline: result.timeline });
+      if (result.timeline.page?.styleOptions) setStyleOptions(result.timeline.page.styleOptions);
     } catch (error) {
       setPhase({ kind: 'error', message: error instanceof Error ? error.message : String(error) });
     } finally {
@@ -343,6 +361,86 @@ export function MotionPanel({
             <p>{timeline?.page ? t('motion.createDesc') : t('motion.planDesc')}</p>
           </div>
         </div>
+        <div className="qq-motion-style-controls">
+          <div className="qq-motion-style-controls-head">
+            <div>
+              <span className="qq-motion-section-kicker">02 · STYLE SYSTEM</span>
+              <strong>{t('motion.styleControlsTitle')}</strong>
+            </div>
+            <small>{t('motion.styleControlsHint')}</small>
+          </div>
+          <div className="qq-motion-style-grid">
+            <label className="qq-motion-style-field">
+              <span>{t('motion.stylePreset')}</span>
+              <select
+                value={styleOptions.preset}
+                onChange={(event) => setStyleOptions((current) => ({ ...current, preset: event.target.value as MotionStyleOptions['preset'] }))}
+                disabled={!loggedIn || busy}
+              >
+                <option value="auto">{t('motion.styleAuto')}</option>
+                <option value="apple-tech-gradient">{t('motion.stylePresetApple')}</option>
+                <option value="editorial-magazine">{t('motion.stylePresetEditorial')}</option>
+                <option value="sketch-note">{t('motion.stylePresetSketch')}</option>
+                <option value="finance-studio-cards">{t('motion.stylePresetFinance')}</option>
+                <option value="newspaper-evidence">{t('motion.stylePresetNewspaper')}</option>
+                <option value="paper-collage">{t('motion.stylePresetCollage')}</option>
+              </select>
+            </label>
+            <label className="qq-motion-style-field">
+              <span>{t('motion.stylePalette')}</span>
+              <select
+                value={styleOptions.palette}
+                onChange={(event) => setStyleOptions((current) => ({ ...current, palette: event.target.value as MotionStyleOptions['palette'] }))}
+                disabled={!loggedIn || busy}
+              >
+                <option value="auto">{t('motion.styleAuto')}</option>
+                <option value="warm">{t('motion.stylePaletteWarm')}</option>
+                <option value="cool">{t('motion.stylePaletteCool')}</option>
+                <option value="neon">{t('motion.stylePaletteNeon')}</option>
+                <option value="monochrome">{t('motion.stylePaletteMono')}</option>
+                <option value="paper">{t('motion.stylePalettePaper')}</option>
+              </select>
+            </label>
+            <label className="qq-motion-style-field">
+              <span>{t('motion.styleTypography')}</span>
+              <select
+                value={styleOptions.typography}
+                onChange={(event) => setStyleOptions((current) => ({ ...current, typography: event.target.value as MotionStyleOptions['typography'] }))}
+                disabled={!loggedIn || busy}
+              >
+                <option value="auto">{t('motion.styleAuto')}</option>
+                <option value="display">{t('motion.styleTypographyDisplay')}</option>
+                <option value="editorial">{t('motion.styleTypographyEditorial')}</option>
+                <option value="mono">{t('motion.styleTypographyMono')}</option>
+                <option value="handwritten">{t('motion.styleTypographyHandwritten')}</option>
+              </select>
+            </label>
+            <label className="qq-motion-style-field">
+              <span>{t('motion.styleDensity')}</span>
+              <select
+                value={styleOptions.density}
+                onChange={(event) => setStyleOptions((current) => ({ ...current, density: event.target.value as MotionStyleOptions['density'] }))}
+                disabled={!loggedIn || busy}
+              >
+                <option value="airy">{t('motion.styleDensityAiry')}</option>
+                <option value="balanced">{t('motion.styleDensityBalanced')}</option>
+                <option value="dense">{t('motion.styleDensityDense')}</option>
+              </select>
+            </label>
+            <label className="qq-motion-style-field">
+              <span>{t('motion.styleIntensity')}</span>
+              <select
+                value={styleOptions.intensity}
+                onChange={(event) => setStyleOptions((current) => ({ ...current, intensity: event.target.value as MotionStyleOptions['intensity'] }))}
+                disabled={!loggedIn || busy}
+              >
+                <option value="calm">{t('motion.styleIntensityCalm')}</option>
+                <option value="dynamic">{t('motion.styleIntensityDynamic')}</option>
+                <option value="explosive">{t('motion.styleIntensityExplosive')}</option>
+              </select>
+            </label>
+          </div>
+        </div>
         <div className="qq-motion-prompt-row">
           <input
             value={prompt}
@@ -373,7 +471,7 @@ export function MotionPanel({
           <section className="qq-motion-preview-card">
             <div className="qq-motion-preview-head">
               <div>
-                <span className="qq-motion-section-kicker">02 · LIVE PREVIEW</span>
+                <span className="qq-motion-section-kicker">03 · LIVE PREVIEW</span>
                 <strong>{activeLabel}</strong>
               </div>
               <span>{timeline.page?.source === 'ai' ? t('motion.aiGenerated') : t('motion.fallbackGenerated')}</span>
@@ -390,7 +488,7 @@ export function MotionPanel({
           <section className="qq-motion-scenes">
             <div className="qq-motion-scenes-head">
               <div>
-                <span className="qq-motion-section-kicker">03 · SCRIPT MAP</span>
+                <span className="qq-motion-section-kicker">04 · SCRIPT MAP</span>
                 <strong>{t('motion.scenesTitle')}</strong>
               </div>
               <div className="qq-motion-scene-actions">

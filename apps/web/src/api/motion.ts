@@ -2,6 +2,7 @@ import type {
   CoverageRow,
   GateResult,
   MotionBeat,
+  MotionStyleOptions,
   MotionTimeline,
 } from '@bokebox/shared/motion';
 import { getToken } from '../lib/auth';
@@ -84,11 +85,12 @@ export function draftMotionTimeline(jobId: string): Promise<MotionDraftResponse>
 export function generateMotionPage(
   jobId: string,
   prompt?: string,
+  styleOptions?: MotionStyleOptions,
 ): Promise<MotionGenerateResponse> {
   return request<MotionGenerateResponse>(`/jobs/${encodeURIComponent(jobId)}/motion/generate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ prompt: prompt?.trim() || undefined }),
+    body: JSON.stringify({ prompt: prompt?.trim() || undefined, styleOptions }),
   });
 }
 

@@ -17,7 +17,10 @@ import { getRequestUser } from '../auth.js';
 import { pathExists } from '../../utils/fs.js';
 import { sendMedia } from './helpers.js';
 import { getRequestLocale, t } from '../../i18n/index.js';
-import type { MotionBeat } from '@bokebox/shared';
+import {
+  normalizeMotionStyleOptions,
+  type MotionBeat,
+} from '@bokebox/shared';
 import { ApiErrorCode, fail } from '../../utils/apiResponse.js';
 import {
   buildFromConfirmed,
@@ -104,15 +107,16 @@ export async function motionRoutes(app: FastifyInstance): Promise<void> {
     };
   });
 
-  app.post<{ Params: { id: string }; Body: { prompt?: unknown } }>(
+  app.post<{ Params: { id: string }; Body: { prompt?: unknown; styleOptions?: unknown } }>(
     '/jobs/:id/motion/generate',
     async (req, reply) => {
       if (!requireUser(req)) return reply.code(401).send({ error: t(getRequestLocale(req), 'auth.notLoggedIn') });
       const job = await getJob(req.params.id);
       if (!job) return reply.code(404).send({ error: t(getRequestLocale(req), 'job.notFound') });
       const prompt = typeof req.body?.prompt === 'string' ? req.body.prompt.trim().slice(0, 800) : undefined;
+      const styleOptions = normalizeMotionStyleOptions(req.body?.styleOptions);
       try {
-        const result = await generateAndBuild(job, prompt);
+        const result = await generateAndBuild(job, prompt, styleOptions);
         if (!result.ok) {
           return reply.code(422).send({
             code: 422,

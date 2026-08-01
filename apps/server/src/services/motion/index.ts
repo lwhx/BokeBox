@@ -14,6 +14,7 @@ import {
   type GateResult,
   type MotionBeat,
   type MotionPageSpec,
+  type MotionStyleOptions,
   type MotionTimeline,
 } from '@bokebox/shared';
 import { loadOptimizedSrt } from './srtOptimizer.js';
@@ -177,6 +178,7 @@ export async function confirmAndBuild(
 export async function generateAndBuild(
   job: Job,
   prompt?: string,
+  styleOptions?: MotionStyleOptions,
 ): Promise<MotionBuildResult> {
   const draft = await draftTimeline(job);
   if (!draft.ok || !draft.gate) {
@@ -187,7 +189,7 @@ export async function generateAndBuild(
       error: draft.error || 'gate-failed',
     };
   }
-  const page = await generateMotionPage(job, draft.beats, prompt);
+  const page = await generateMotionPage(job, draft.beats, prompt, styleOptions);
   return confirmAndBuild(job, draft.beats, page);
 }
 

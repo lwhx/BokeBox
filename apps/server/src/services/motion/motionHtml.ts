@@ -775,6 +775,22 @@ function kineticMotionCss(): string {
 @keyframes motion-drift-in{from{opacity:0;transform:translateX(-80px)}to{opacity:1;transform:none}}
 @keyframes motion-type-in{from{opacity:0;transform:scaleX(.72);transform-origin:left center}to{opacity:1;transform:none}}
 @keyframes motion-pulse-in{from{opacity:0;transform:scale(1.14)}to{opacity:1;transform:none}}
+/* structured style controls: generated options are rendered as real visual rules */
+body.motion-typography-editorial .beat-title{font-family:Georgia,"Songti SC",serif;font-weight:760;letter-spacing:-.03em}
+body.motion-typography-mono .beat-title{font-family:var(--font-mono,ui-monospace,SFMono-Regular,monospace);font-weight:760;letter-spacing:-.06em}
+body.motion-typography-handwritten .beat-title{font-family:"Comic Sans MS","Kaiti SC",cursive;font-weight:700;letter-spacing:-.035em}
+body.motion-density-airy .scene{padding:150px 190px}
+body.motion-density-airy .beat-title{max-width:1400px;line-height:1.08;margin-bottom:78px}
+body.motion-density-airy .beat-steps{gap:38px}
+body.motion-density-dense .scene{padding:86px 116px}
+body.motion-density-dense .beat-title{max-width:1600px;font-size:76px;line-height:1.12;margin-bottom:42px}
+body.motion-density-dense .beat-body{margin-bottom:34px;font-size:26px}
+body.motion-density-dense .beat-steps{gap:16px}
+body.motion-intensity-calm .beat.active.is-entering .scene-copy,
+body.motion-intensity-calm .beat.active.is-entering .scene-visual{animation-duration:1.08s}
+body.motion-intensity-explosive .beat.active.is-entering .scene-copy,
+body.motion-intensity-explosive .beat.active.is-entering .scene-visual{animation-duration:.48s}
+body.motion-intensity-explosive .beat-title{font-weight:820;letter-spacing:-.075em}
 @media (max-width:1100px){.scene{padding:92px 88px 72px}.beat-title{font-size:82px}.beat-hook-slam .beat-title{font-size:106px}.beat-quote-cut .scene{padding-left:120px}.beat-quote-cut .beat-title{font-size:80px}.scene-number strong{font-size:190px}}
 @media (max-width:900px){.scene{padding:76px 56px 60px}.scene-meta{margin-bottom:26px}.beat-kicker{font-size:15px}.scene-counter,.scene-footer{font-size:11px}.beat-title,.beat-hook-slam .beat-title,.beat-diagonal-reveal .beat-title,.beat-quote-cut .beat-title,.beat-closing-lock .beat-title{font-size:58px}.beat-body{font-size:19px}.scene-visual{margin-top:28px}.step-text{font-size:18px}.scene-number strong{font-size:140px}.scene-split{grid-template-columns:1fr 22px 1fr}.scene-split>div{min-height:120px;padding:16px}.scene-split strong{font-size:20px}.scene-quote{font-size:31px}.beat-broll .beat-title{font-size:52px}}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important;scroll-behavior:auto!important}.beat.active.is-entering .beat-title,.beat.active.is-entering .scene-copy,.beat.active.is-entering .scene-visual,.step{opacity:1!important;transform:none!important;filter:none!important;clip-path:none!important}}
@@ -785,6 +801,10 @@ function kineticMotionCss(): string {
 export function renderMotionHtml(timeline: MotionTimeline, jobId: string): string {
   const [c1, c2] = gradientPair(jobId);
   const pageStyle = timeline.page?.style || 'apple-tech-gradient';
+  const styleOptions = timeline.page?.styleOptions;
+  const typography = styleOptions?.typography || 'auto';
+  const density = styleOptions?.density || 'balanced';
+  const intensity = styleOptions?.intensity || 'dynamic';
   const beatsHtml = timeline.beats
     .map((beat, index) =>
       beatHtml({
@@ -903,7 +923,7 @@ body{overflow:hidden;background:var(--bg);color:var(--text);
 <title>${esc(timeline.title)} · Motion</title>
 <style>${css}${richMotionCss()}${kineticMotionCss()}</style>
 </head>
-<body class="js style-${esc(pageStyle)}" data-motion-job="${esc(jobId)}">
+<body class="js style-${esc(pageStyle)} motion-typography-${esc(typography)} motion-density-${esc(density)} motion-intensity-${esc(intensity)}" data-motion-job="${esc(jobId)}">
 <div id="stage">
 ${beatsHtml}
 <div class="hud">

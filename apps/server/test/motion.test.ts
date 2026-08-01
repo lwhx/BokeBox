@@ -4,6 +4,7 @@ import {
   buildCoverageRows,
   buildSrtFromCues,
   cuesFromTiming,
+  normalizeMotionStyleOptions,
   formatMotionClock,
   formatSrtTimestampMs,
   optimizeSrt,
@@ -103,6 +104,19 @@ describe('motion srt parse & optimize', () => {
         [3500, 8100],
       ],
     );
+  });
+});
+
+describe('motion structured style options', () => {
+  it('normalizes partial input and rejects unknown-only input', () => {
+    assert.deepEqual(normalizeMotionStyleOptions({ palette: 'neon', intensity: 'explosive' }), {
+      preset: 'auto',
+      palette: 'neon',
+      typography: 'auto',
+      density: 'balanced',
+      intensity: 'explosive',
+    });
+    assert.equal(normalizeMotionStyleOptions({ palette: 'unknown' }), undefined);
   });
 });
 
@@ -326,6 +340,13 @@ describe('motion AI page layer', () => {
         source: 'ai' as const,
         generatedAt: new Date().toISOString(),
         style: 'apple-tech-gradient' as const,
+        styleOptions: {
+          preset: 'editorial-magazine' as const,
+          palette: 'neon' as const,
+          typography: 'mono' as const,
+          density: 'airy' as const,
+          intensity: 'explosive' as const,
+        },
         scenes: [
           { beatId: 'b1', layout: 'hero' as const, primitive: 'Claim' as const, visual: 'claim-lockup' as const, variant: 'hook-slam' as const, motion: 'slam' as const, eyebrow: 'HOOK', title: '先打爆点', body: '', bullets: [], accent: '#f97316', accent2: '#fbbf24' },
           { beatId: 'b2', layout: 'split' as const, primitive: 'Evidence' as const, visual: 'number-count' as const, variant: 'signal-bars' as const, motion: 'scan' as const, eyebrow: 'EVIDENCE', title: '再给证据', body: '', bullets: ['一个数字'], accent: '#22d3ee', accent2: '#a78bfa' },
@@ -339,6 +360,9 @@ describe('motion AI page layer', () => {
     assert.match(html, /beat-closing-lock/);
     assert.match(html, /motion-slam-in/);
     assert.match(html, /replayBeat/);
+    assert.match(html, /motion-typography-mono/);
+    assert.match(html, /motion-density-airy/);
+    assert.match(html, /motion-intensity-explosive/);
     assert.equal(validateMotionHtml(html, timeline).ok, true);
   });
 
