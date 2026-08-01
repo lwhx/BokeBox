@@ -368,7 +368,7 @@ export const zhCN = {
     createTitle: '告诉 AI 你想怎么讲',
     createDesc: '它会读取本集口播稿、节目大纲和真实时间轴，生成一套适合录屏的 16:9 页面。',
     planTitle: '章节计划已经准备好',
-    planDesc: '音频合成时已同步生成 SRT，并把口播稿整理成 2–3 个主章节。现在只需要给这些章节选择视觉表达。',
+    planDesc: '音频合成时已同步生成 SRT，系统会按口播稿长度安排章节和动画数量。现在只需要给这些画面选择视觉表达。',
     promptPlaceholder: '例如：像 Apple 发布会一样克制，重点突出三个结论…',
     generate: '生成页面',
     regenerate: '重新生成',

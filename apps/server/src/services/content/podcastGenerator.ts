@@ -48,46 +48,119 @@ function chapterTextParts(script: string): string[] {
     .split(/\n{2,}/u)
     .map((part) => part.trim())
     .filter(Boolean);
-  if (paragraphs.length >= 2) return paragraphs;
+  const lines = paragraphs.flatMap((paragraph) =>
+    paragraph
+      .split(/\n/u)
+      .map((line) => line.trim())
+      .filter(Boolean),
+  );
+  const sentences = lines.flatMap((line) =>
+    line
+      .split(/(?<=[。！？!?\.])\s*/u)
+      .map((part) => part.trim())
+      .filter(Boolean),
+  );
+  const source = sentences.length ? sentences : [String(script || '').trim()].filter(Boolean);
 
-  const lines = String(script || '')
-    .split(/\n/u)
-    .map((line) => line.trim())
-    .filter(Boolean);
-  if (lines.length >= 2) return lines;
-
-  const sentences = String(script || '')
-    .split(/(?<=[。！？!?\.])\s*/u)
-    .map((part) => part.trim())
-    .filter(Boolean);
-  return sentences.length ? sentences : [String(script || '').trim()].filter(Boolean);
+  // 一个超长句也要拆成可独立对齐的画面素材，避免整集只有少量章节。
+  const parts: string[] = [];
+  for (const part of source) {
+    const plainLength = countSpokenChars(part);
+    if (plainLength <= 240) {
+      parts.push(part);
+      continue;
+    }
+    const chars = Array.from(part);
+    for (let start = 0; start < chars.length; start += 220) {
+      parts.push(chars.slice(start, start + 220).join(''));
+    }
+  }
+  return parts;
 }
 
-function fallbackMotionChapters(
+const MOTION_CHARS_PER_CHAPTER = 220;
+const MOTION_MIN_CHAPTERS = 2;
+const MOTION_MAX_CHAPTERS = 24;
+
+function shortChapterTitle(text: string, fallback: string): string {
+  const clean = String(text || '')
+    .replace(/^\s*[（(][^）)]*[）)]\s*/u, '')
+    .replace(/^[\d一二三四五六七八九十]+[、.．]\s*/u, '')
+    .replace(/^[-*]\s*/u, '')
+    .replace(/\s+/gu, ' ')
+    .trim();
+  if (!clean) return fallback;
+  const chars = Array.from(clean);
+  return chars.length <= 28 ? clean : `${chars.slice(0, 27).join('')}…`;
+}
+
+/**
+ * 根据口播稿实际字数生成章节，不把数量锁死为 2–3。
+ * 数量只是由脚本长度推导出的起点，后续 storyboard 还会结合真实 SRT cue 再做一次对齐。
+ */
+export function buildMotionChaptersFromScript(
   script: string,
-  outline: Array<{ title: string; summary: string }>,
+  outline: Array<{ title: string; summary: string }> = [],
+  seeds: MotionChapter[] = [],
 ): MotionChapter[] {
   const parts = chapterTextParts(script);
-  if (parts.length < 2) {
-    return [{
-      id: 'chapter-1',
-      title: outline[0]?.title || '本期重点',
-      summary: outline[0]?.summary || '围绕本期主题提炼核心信息。',
-      script: script.trim(),
-    }];
+  if (!parts.length) return [];
+
+  const spokenCount = Math.max(1, countSpokenChars(script));
+  const desiredCount = Math.min(
+    MOTION_MAX_CHAPTERS,
+    Math.max(MOTION_MIN_CHAPTERS, Math.ceil(spokenCount / MOTION_CHARS_PER_CHAPTER)),
+  );
+  const count = Math.min(desiredCount, parts.length);
+  const totalWeight = parts.reduce((sum, part) => sum + Math.max(1, countSpokenChars(part)), 0);
+  const groups: string[][] = Array.from({ length: count }, () => []);
+  let groupIndex = 0;
+  let groupWeight = 0;
+  for (let index = 0; index < parts.length; index += 1) {
+    const part = parts[index];
+    const weight = Math.max(1, countSpokenChars(part));
+    const remainingParts = parts.length - index;
+    const remainingGroups = count - groupIndex;
+    const targetWeight = (totalWeight * (groupIndex + 1)) / count;
+    const shouldAdvance =
+      groupIndex < count - 1 &&
+      ((groupWeight > 0 && groupWeight + weight >= targetWeight) || remainingParts <= remainingGroups);
+    if (shouldAdvance) {
+      groupIndex += 1;
+      groupWeight = 0;
+    }
+    groups[groupIndex].push(part);
+    groupWeight += weight;
   }
-  const count = Math.min(3, Math.max(2, parts.length >= 3 ? 3 : 2));
-  const size = Math.ceil(parts.length / count);
-  return Array.from({ length: count }, (_, index) => {
-    const chunk = parts.slice(index * size, (index + 1) * size).join('\n');
-    const source = outline[index] || outline[outline.length - 1];
-    return {
-      id: `chapter-${index + 1}`,
-      title: source?.title || ['开场钩子', '核心观点', '收束行动'][index] || `第 ${index + 1} 章`,
-      summary: source?.summary || '从口播稿中提炼的一段核心信息。',
-      script: chunk,
-    };
-  }).filter((chapter) => chapter.script.trim());
+
+  const sourcePool = seeds.length ? seeds : outline.map((item, index) => ({
+    id: `outline-${index + 1}`,
+    title: item.title,
+    summary: item.summary,
+    script: '',
+  }));
+  return groups
+    .map((group, index) => {
+      const sourceIndex = Math.min(
+        Math.max(0, sourcePool.length - 1),
+        Math.floor((index / Math.max(1, count - 1)) * Math.max(0, sourcePool.length - 1)),
+      );
+      const source = sourcePool[sourceIndex];
+      const chapterScript = group.join('\n');
+      const firstPart = group[0] || '';
+      return {
+        id: `chapter-${index + 1}`,
+        title: shortChapterTitle(
+          source?.title && (count <= sourcePool.length || index === sourceIndex)
+            ? source.title
+            : firstPart,
+          index === count - 1 ? '收束与行动' : `第 ${index + 1} 个重点`,
+        ),
+        summary: source?.summary || shortChapterTitle(firstPart, '从口播稿中提炼的一段核心信息。'),
+        script: chapterScript,
+      } satisfies MotionChapter;
+    })
+    .filter((chapter) => chapter.script.trim());
 }
 
 function normalizeMotionChapters(
@@ -104,9 +177,9 @@ function normalizeMotionChapters(
           summary: String(row.summary || '').trim().slice(0, 180),
           script: String(row.script || '').trim(),
         } satisfies MotionChapter;
-      }).filter((chapter) => chapter.title && chapter.script).slice(0, 3)
+      }).filter((chapter) => chapter.title && chapter.script)
     : [];
-  return candidates.length >= 2 ? candidates : fallbackMotionChapters(script, outline);
+  return buildMotionChaptersFromScript(script, outline, candidates);
 }
 
 /**

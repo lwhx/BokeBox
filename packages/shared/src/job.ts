@@ -88,7 +88,7 @@ export interface PodcastContent {
   script: string;
   /** 节目笔记（Markdown） */
   showNotes: string;
-  /** 生成口播稿时同步规划的 2–3 个 Motion 章节 */
+  /** 生成口播稿时按实际口播长度同步规划的 Motion 章节 */
   motionChapters?: MotionChapter[];
   /** 知识闪卡（独立 AI 生成） */
   flashcards?: Flashcard[];

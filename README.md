@@ -157,7 +157,7 @@ Create, listen, and manage assets in one private space.
 ### Assets & listening
 - Job detail: transcript, script, notes, flashcards, cover, audio
 - Player: progress memory, speed, sleep timer (incl. end of episode)
-- **Motion mode**: plan 2–3 chapters while generating the spoken script, write SRT during audio synthesis, then turn those chapters into a 16:9 info animation driven by the SRT master clock (see [docs/guide/motion-mode.md](./docs/guide/motion-mode.md))
+- **Motion mode**: derive the chapter and animation count from the spoken script, write SRT during audio synthesis, then turn the script-driven intervals into a 16:9 info animation driven by the SRT master clock (see [docs/guide/motion-mode.md](./docs/guide/motion-mode.md))
 - Albums for continuous play; topic graph by tags
 
 ### Settings center

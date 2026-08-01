@@ -8,7 +8,26 @@ function cue(startMs: number, endMs: number, text: string): SrtCue {
 }
 
 describe('motion storyboard (server)', () => {
-  it('uses upstream motion chapters and keeps the page count at two or three', () => {
+  it('derives more animation beats from a longer spoken chapter', () => {
+    const cues = Array.from({ length: 24 }, (_, index) =>
+      cue(index * 3000, index * 3000 + 2600, `第${index + 1}段继续解释这个方法如何落地并带来实际变化，同时补充一个可以执行的具体步骤。`),
+    );
+    const chapters = [{
+      id: 'long-script',
+      title: '完整方法',
+      summary: '长口播稿应按内容长度拆成更多动画区间。',
+      script: cues.map((item) => item.text).join('\n'),
+    }];
+    const story = buildStoryboard({ title: '长稿', cues, chapters });
+
+    assert.ok(story.beats.length > 3, '长口播稿不应仍被限制在 2–3 个页面');
+    assert.equal(story.beats.at(-1)?.kind, 'closing');
+    assert.equal(story.beats[0].startMs, 0);
+    const gate = validateTimeline(story.beats, cues.at(-1)!.endMs);
+    assert.equal(gate.pass, true);
+  });
+
+  it('uses upstream motion chapters and preserves their semantic order', () => {
     const cues: SrtCue[] = [
       cue(0, 4000, '先说结论，这个方法会改变内容生产。'),
       cue(4500, 9000, '第一章继续解释为什么要改变节奏。'),

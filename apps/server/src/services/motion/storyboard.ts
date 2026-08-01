@@ -156,7 +156,7 @@ export interface StoryboardInput {
   cues: SrtCue[];
   lines?: ScriptLineTiming[];
   outline?: PodcastSegment[];
-  /** 口播稿生成阶段确定的 2–3 个章节；存在时优先于旧 outline 推断。 */
+  /** 口播稿生成阶段按内容长度确定的章节；存在时优先于旧 outline 推断。 */
   chapters?: MotionChapter[];
 }
 
@@ -168,7 +168,7 @@ export interface StoryboardResult {
 
 const MIN_BEAT_MS = 5_000;
 const MAX_BEAT_MS = 30_000;
-const MAX_BEATS = 16;
+const MAX_BEATS = 24;
 /** 空档超过该值时必须插入 broll beat 填充（与门禁 gapLimitMs 对齐） */
 const BROLL_GAP_THRESHOLD_MS = 1500;
 
@@ -210,7 +210,12 @@ function findChapterAnchor(
 
 function buildLegacyChapters(input: StoryboardInput): MotionChapter[] {
   if (input.cues.length < 2) return [];
-  const count = Math.min(3, input.cues.length >= 3 ? 3 : 2);
+  const totalWeight = input.cues.reduce((sum, cue) => sum + charWeight(cue.text), 0);
+  const count = Math.min(
+    MAX_BEATS,
+    input.cues.length,
+    Math.max(2, Math.ceil(totalWeight / 220)),
+  );
   return Array.from({ length: count }, (_, index) => {
     const start = Math.floor((index * input.cues.length) / count);
     const end = Math.max(start, Math.floor(((index + 1) * input.cues.length) / count) - 1);
@@ -224,16 +229,52 @@ function buildLegacyChapters(input: StoryboardInput): MotionChapter[] {
   });
 }
 
+/** 按 cue 的口播字重把一个章节切成多个可独立动画的画面区间。 */
+function splitCueRange(
+  cues: SrtCue[],
+  startIndex: number,
+  endIndex: number,
+  count: number,
+): Array<{ start: number; end: number }> {
+  const safeCount = Math.max(1, Math.min(count, endIndex - startIndex + 1));
+  if (safeCount === 1) return [{ start: startIndex, end: endIndex }];
+  const weights = cues.slice(startIndex, endIndex + 1).map((cue) => charWeight(cue.text));
+  const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
+  const prefix: number[] = [0];
+  for (const weight of weights) prefix.push(prefix[prefix.length - 1] + weight);
+  const ranges: Array<{ start: number; end: number }> = [];
+  let rangeStart = startIndex;
+  for (let part = 1; part < safeCount; part += 1) {
+    const target = (totalWeight * part) / safeCount;
+    let cut = rangeStart;
+    while (cut < endIndex && prefix[cut - startIndex + 1] < target) cut += 1;
+    const remainingRanges = safeCount - part;
+    const maxCut = endIndex - remainingRanges;
+    cut = Math.max(rangeStart, Math.min(cut, maxCut));
+    ranges.push({ start: rangeStart, end: cut });
+    rangeStart = cut + 1;
+  }
+  ranges.push({ start: rangeStart, end: endIndex });
+  return ranges;
+}
+
+function chapterBeatCount(chapter: MotionChapter, startIndex: number, endIndex: number): number {
+  const cueCount = endIndex - startIndex + 1;
+  const spokenChars = charWeight(chapter.script);
+  // 约 220 字 / 张；真实 cue 数是硬上限，避免生成无法落到时间轴的空页面。
+  return Math.max(1, Math.min(cueCount, Math.ceil(spokenChars / 220)));
+}
+
 /**
- * 新流程：直接消费口播稿生成时确定的章节，不再按每条 SRT cue 生成页面。
- * 章节窗口覆盖中间的自然停顿，因此页面数量稳定为 2–3 张，SRT 只负责
- * 在章节内部推进真实音频时钟。
+ * 新流程：消费口播稿章节，再按每章真实口播长度细分多个页面。
+ * 页面数量不再固定为 2–3 张：脚本越长、可对齐的 cue 越多，动画 beat 就越多；
+ * 章节窗口仍覆盖自然停顿，SRT 继续作为唯一的真实毫秒主时钟。
  */
 function buildChapterStoryboard(input: StoryboardInput): StoryboardResult | null {
   const chapters = (input.chapters || [])
     .filter((chapter) => chapter && chapter.title.trim() && chapter.script.trim())
-    .slice(0, 3);
-  if (chapters.length < 2 || chapters.length > input.cues.length || !input.cues.length) return null;
+    .slice(0, input.cues.length);
+  if (chapters.length < 1 || !input.cues.length) return null;
 
   const starts = [0];
   for (let i = 1; i < chapters.length; i += 1) {
@@ -248,34 +289,58 @@ function buildChapterStoryboard(input: StoryboardInput): StoryboardResult | null
 
   const durationMs = input.cues[input.cues.length - 1].endMs;
   const paired = alignCuesToLines(input.cues, input.lines || []);
-  const beats: MotionBeat[] = chapters.map((chapter, index) => {
+  const chapterWindows = chapters.map((chapter, index) => {
     const startIndex = starts[index];
     const endIndex = index + 1 < starts.length ? starts[index + 1] - 1 : input.cues.length - 1;
     const startMs = index === 0 ? 0 : input.cues[startIndex].startMs;
     // 章节窗口直接延伸到下一章起点，把自然停顿留在当前章节内，避免
     // 用每个 cue 的 endMs 产生额外 beat/空档。
     const endMs = index === chapters.length - 1 ? durationMs : input.cues[starts[index + 1]].startMs;
-    const cueCount = Math.max(1, endIndex - startIndex + 1);
-    const stepCount = Math.min(3, Math.max(2, Math.round((endMs - startMs) / 10_000) + 1, cueCount));
-    const anchors = findStepAnchorIndices(paired, startIndex, Math.max(startIndex, endIndex), stepCount);
-    return {
-      id: `b${index + 1}`,
-      chapterId: chapter.id,
-      kind: index === chapters.length - 1 ? 'closing' : 'motion',
-      title: chapter.title,
-      detail: chapter.summary || undefined,
-      startMs,
-      endMs,
-      stepTimes: anchors.map((anchor) => input.cues[anchor].startMs),
-      stepLabels: anchors
-        .map((anchor) => shortTitleFromCues(input.cues, anchor, Math.min(anchor + 1, endIndex), 18))
-        .filter(Boolean),
-      cueRange: [startIndex + 1, endIndex + 1],
-    };
+    return { chapter, index, startIndex, endIndex, startMs, endMs };
   });
+  const beats: MotionBeat[] = [];
+  for (const window of chapterWindows) {
+    const ranges = splitCueRange(
+      input.cues,
+      window.startIndex,
+      window.endIndex,
+      chapterBeatCount(window.chapter, window.startIndex, window.endIndex),
+    );
+    ranges.forEach((range, rangeIndex) => {
+      const isLastRange = rangeIndex === ranges.length - 1;
+      const isClosing = window.index === chapterWindows.length - 1 && isLastRange;
+      const startMs = rangeIndex === 0 ? window.startMs : input.cues[range.start].startMs;
+      const endMs = isLastRange ? window.endMs : input.cues[ranges[rangeIndex + 1].start].startMs;
+      const beatMs = Math.max(1, endMs - startMs);
+      const cueCount = range.end - range.start + 1;
+      const stepCount = Math.min(5, Math.max(2, Math.round(beatMs / 7_000) + 1, cueCount));
+      const anchors = findStepAnchorIndices(
+        paired,
+        range.start,
+        Math.max(range.start, range.end),
+        stepCount,
+      );
+      beats.push({
+        id: `b${beats.length + 1}`,
+        chapterId: window.chapter.id,
+        kind: isClosing ? 'closing' : 'motion',
+        title: rangeIndex === 0
+          ? window.chapter.title
+          : shortTitleFromCues(input.cues, range.start, range.end),
+        detail: window.chapter.summary || undefined,
+        startMs,
+        endMs,
+        stepTimes: anchors.map((anchor) => input.cues[anchor].startMs),
+        stepLabels: anchors
+          .map((anchor) => shortTitleFromCues(input.cues, anchor, Math.min(anchor + 1, range.end), 18))
+          .filter(Boolean),
+        cueRange: [range.start + 1, range.end + 1],
+      });
+    });
+  }
   return {
     beats,
-    notes: [`使用口播稿预先规划的 ${chapters.length} 个 Motion 章节，页面数量固定为 ${chapters.length} 张`],
+    notes: [`根据口播稿长度与 SRT cue 对齐为 ${beats.length} 个 Motion 动画区间（${chapters.length} 个语义章节）`],
   };
 }
 
@@ -313,9 +378,9 @@ function beatTitle(seg: PodcastSegment | undefined, fallback: string): string {
 
 /**
  * 构建分镜：
- * 1. 大纲每个 segment → 一个 beat（大纲缺失则按字重等分 4-8 段）；
+ * 1. 大纲每个 segment → 一个 beat（大纲缺失则按口播字重动态等分）；
  * 2. beat 边界钉在 anchor cue 的 startMs（末 beat 的 endMs = 主时钟总时长）；
- * 3. beat 内按语义触发词分 2-3 步，stepTimes = 各步首 cue 的 startMs；
+ * 3. beat 内按语义触发词动态分 2-5 步，stepTimes = 各步首 cue 的 startMs；
  * 4. 末 beat 标记为收束页（closing）。
  */
 export function buildStoryboard(input: StoryboardInput): StoryboardResult {
@@ -397,12 +462,12 @@ export function buildStoryboard(input: StoryboardInput): StoryboardResult {
       });
     }
   } else {
-    // 大纲缺失：按字重把 cue 均分 4-8 段，并注入大空档强制切分点
+    // 大纲缺失：按口播字重动态均分，并注入大空档强制切分点
     notes.push('没有大纲，按字重把口播等分为 beat');
     const totalWeight = cues.reduce((a, c) => a + charWeight(c.text), 0);
     const beatCount = Math.min(
       MAX_BEATS,
-      Math.max(4, Math.round(totalWeight / 420)),
+      Math.max(2, Math.ceil(totalWeight / 220)),
     );
     const lastIdx = cues.length - 1;
     const cuts: number[] = [0];

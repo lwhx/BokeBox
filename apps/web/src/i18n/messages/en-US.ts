@@ -372,7 +372,7 @@ export const enUS: MessageTree = {
     createTitle: 'Tell AI how it should feel',
     createDesc: 'It reads the episode script, outline, and real timing to build a 16:9 page ready for recording.',
     planTitle: 'The chapter plan is ready',
-    planDesc: 'Audio synthesis already produced the SRT and grouped the script into 2–3 primary chapters. Now choose the visual direction.',
+    planDesc: 'Audio synthesis already produced the SRT. The script length now drives the number of chapters and animated scenes; choose the visual direction for them.',
     promptPlaceholder: 'e.g. restrained like an Apple keynote, with three clear takeaways…',
     generate: 'Generate page',
     regenerate: 'Regenerate',
